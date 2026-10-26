@@ -88,8 +88,8 @@ struct OnboardingView: View {
         case .welcome:
             PageBody(symbol: "laptopcomputer.and.arrow.down",
                      title: tr("Welcome to LazyMac", "LazyMac에 오신 걸 환영해요"),
-                     text: tr("LazyMac remembers the apps and tools on this Mac.\nOn your next Mac, it installs them again, clean.\nOld files and leftovers stay behind.",
-                              "LazyMac은 이 맥에 깔린 앱과 도구를 기억해요.\n다음 맥에는 그것을 깨끗하게 새로 설치해요.\n묵은 파일과 찌꺼기는 옮기지 않아요."))
+                     text: tr("LazyMac remembers the apps and tools on this Mac.\nOn your next Mac, it installs them again, clean.\nOld files and leftovers stay behind.\nBacking up projects and other files is optional.",
+                              "LazyMac은 이 맥에 깔린 앱과 도구를 기억해요.\n다음 맥에는 그것을 깨끗하게 새로 설치해요.\n묵은 파일과 찌꺼기는 옮기지 않아요.\n프로젝트나 이 맥의 파일 백업은 원할 때 켜는 선택 기능이에요."))
         case .apps:
             PageBody(symbol: "square.grid.2x2",
                      title: tr("Your apps and tools", "앱과 도구"),
