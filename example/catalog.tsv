@@ -1,0 +1,13 @@
+section	group	id	name	name_ko	decision	how	ref	what_en	what_ko	why_en	why_ko
+app	assistants	ExampleNotes	Example Notes	예제 메모	keep	byhand	https://example.com/notes	A fictional notes app	가상의 메모 앱	Example only	예제 전용
+app	assistants	ExampleSketch	Example Sketch	예제 그림	keep	byhand	https://example.com/sketch	A fictional drawing app	가상의 그림 앱	Example only	예제 전용
+app	assistants	ExampleReader	Example Reader	예제 읽기	ask	byhand	https://example.com/reader	A fictional reader	가상의 읽기 앱	Example only	예제 전용
+app	assistants	ExampleTimer	Example Timer	예제 타이머	drop	byhand	https://example.com/timer	A fictional timer	가상의 타이머	Example only	예제 전용
+cli	tools	gh	GitHub CLI	GitHub CLI	keep	brew	gh	Repository tools	저장소 도구	Example only	예제 전용
+cli	containers	colima	Colima	Colima	keep	brew	colima	Container tools	컨테이너 도구	Example only	예제 전용
+cli	rust	rust-analyzer	Rust analyzer	Rust 분석기	keep	brew	rust-analyzer	Rust tooling	Rust 도구	Example only	예제 전용
+cli	rust	rustup	Rustup	Rustup	drop	brew	rustup	Rust installer	Rust 설치기	Example only	예제 전용
+cli	tools	example-cli	Example CLI	예제 CLI	keep	npm	example-cli	A fictional CLI	가상의 CLI	Example only	예제 전용
+job	backup	local.lazymac-daily	LazyMac daily	LazyMac 매일 백업	keep	register	local.lazymac-daily	Scheduled backup	예약 백업	Example only	예제 전용
+app	assistants	ExampleStore	Example Store	예제 스토어	keep	mas	123	A fictional store app	가상의 스토어 앱	Example only	예제 전용
+setting	fonts	ExampleSans	Example Sans	예제 글꼴	keep	copy	ExampleSans	A fictional font	가상의 글꼴	Example only	예제 전용

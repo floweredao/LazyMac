@@ -1,0 +1,3 @@
+# Secondary Mac example
+from pro
+- job/local.lazymac-daily

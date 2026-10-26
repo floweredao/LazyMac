@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>LazyMac history</title>
+<style>
+:root{color-scheme:light dark;--bg:#fafafa;--card:#fff;--fg:#1d1d1f;--mute:#6e6e73;--line:#e5e5ea;--acc:#0a66d8;--add:#1f8a3b;--rem:#c4302b;--chg:#b26a00}
+@media (prefers-color-scheme:dark){:root{--bg:#111113;--card:#1c1c1f;--fg:#f2f2f7;--mute:#98989f;--line:#2c2c30;--acc:#5aa2ff;--add:#4cc26a;--rem:#ff6b62;--chg:#f0a83a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",sans-serif}
+header{max-width:1100px;margin:0 auto;padding:28px 20px 8px;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+header h1{margin:0;font-size:24px}
+header p{margin:0;color:var(--mute);flex:1 1 280px}
+header button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:4px 10px;cursor:pointer}
+.sidebar{max-width:1100px;margin:0 auto;padding:12px 20px 40px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.sidebar_primary{flex-basis:0;flex-grow:999;min-inline-size:min(100%,30rem)}
+.sidebar_secondary{flex-basis:15rem;flex-grow:1}
+nav ol{list-style:none;margin:0;padding:0;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:min(75vh,42rem);position:relative}
+@media (max-width:640px){nav ol{max-height:10.5rem}}
+nav li+li{border-top:1px solid var(--line)}
+nav a{display:flex;justify-content:space-between;gap:8px;padding:9px 14px;color:inherit;text-decoration:none;font-variant-numeric:tabular-nums}
+nav a[aria-current]{background:color-mix(in srgb,var(--acc) 14%,transparent);font-weight:600}
+nav a:hover{background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.badges{display:flex;gap:6px;font-size:13px}
+.add{color:var(--add)}.rem{color:var(--rem)}.chg{color:var(--chg)}.mute{color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.card h2{margin:0 0 10px;font-size:17px}
+.stats{display:flex;flex-wrap:wrap;gap:10px}
+.stat{flex:1 1 7rem;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:inherit;color:inherit;background:transparent;text-align:start;cursor:pointer}
+.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.stat span{color:var(--mute);font-size:13px}
+.stat.all{position:relative;background:color-mix(in srgb,var(--fg) 5%,transparent)}
+.stat .tot{position:absolute;top:7px;right:10px;font-size:11px;line-height:1.2;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+.stat:hover{border-color:color-mix(in srgb,var(--acc) 50%,var(--line))}
+.stat[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.stat[aria-pressed=true] span{color:var(--fg)}
+.stat:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.hint{margin:8px 0 0;color:var(--mute);font-size:13px}
+.card h2 .mute{font-weight:400;font-size:14px;margin-left:8px}
+ul.rows{list-style:none;margin:0;padding:0}
+ul.rows li{padding:6px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:baseline}
+ul.rows li:first-child{border-top:0}
+.tag{flex:none;font-size:12px;font-weight:600;min-width:4.5rem}
+.what{color:var(--mute);font-size:13px}
+details{border-top:1px solid var(--line);padding:8px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:600}
+summary .mute{font-weight:400;font-size:13px;margin-left:6px}
+.sub{margin:12px 0 2px;font-size:13px;font-weight:600;color:var(--mute);display:flex;gap:6px;align-items:baseline}
+.sub .mute{font-weight:400}
+.grp{flex:none;font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-left:auto}
+ul.rows li>span:nth-child(2){flex:1 1 10rem;min-width:0}
+@media (max-width:640px){ul.rows li{flex-wrap:wrap;row-gap:4px}.grp{margin-left:calc(4.5rem + 10px)}}
+footer{max-width:1100px;margin:0 auto;padding:0 20px 32px;color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1 data-t="title">LazyMac history</h1>
+  <p data-t="lead"></p>
+  <button id="lang" type="button"></button>
+</header>
+<div class="sidebar">
+  <aside class="sidebar_secondary"><nav aria-label="Days"><ol id="days"></ol></nav></aside>
+  <main class="sidebar_primary" id="day"></main>
+</div>
+<footer id="foot"></footer>
+<script>
+const T = {
+  en: { title: "LazyMac history", lead: "What was on this Mac's list each day, and what changed since the day before.", other: "한국어",
+    total: "items", tot: "total", keep: "✅ bring", drop: "⛔ leave", ask: "❓ your call", changes: "Changes since the day before", first: "First snapshot: nothing to compare with yet.",
+    none: "No change.", added: "added", removed: "removed", changed: "changed", list: "Whole list", updated: "Updated",
+    filter: "Show in the list below", hint: "Press a number to show only those items below. Press it again or the total to show everything.",
+    shown: (n, all) => `${n} of ${all} shown`, empty: "No items of this kind on this day.",
+    sec: { app: "Apps", cli: "Command-line tools", job: "Running in the background", setting: "Settings and fonts", elsewhere: "Kept in other repos", leftover: "Left behind" },
+    note: "Sign-in, key and private-data rows are left off this page." },
+  ko: { title: "LazyMac 히스토리", lead: "날마다 이 맥 목록에 무엇이 있었고, 전날보다 무엇이 바뀌었는지 보여요.", other: "English",
+    total: "항목", tot: "전체", keep: "✅ 가져감", drop: "⛔ 두고 감", ask: "❓ 확인 필요", changes: "전날보다 바뀐 것", first: "첫 스냅샷이라 비교할 전날이 없어요.",
+    none: "바뀐 것 없음.", added: "추가", removed: "빠짐", changed: "바뀜", list: "전체 목록", updated: "갱신",
+    filter: "아래 목록에 보일 종류", hint: "숫자를 누르면 그 종류만 아래에 보여요. 한 번 더 누르거나 전체 칸을 누르면 다 보여요.",
+    shown: (n, all) => `${all}개 중 ${n}개`, empty: "이날은 이 종류 항목이 없어요.",
+    sec: { app: "앱", cli: "명령줄 도구", job: "뒤에서 도는 것", setting: "설정·글꼴", elsewhere: "다른 저장소에 있는 것", leftover: "두고 가는 것" },
+    note: "로그인·키·개인 데이터 줄은 이 페이지에 올리지 않아요." },
+};
+const DEC = { keep: "✅", drop: "⛔", ask: "❓" };
+let lang = localStorage.getItem("lang") || (navigator.language.startsWith("ko") ? "ko" : "en");
+let index, cache = {}, filter = null, current;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const nm = (i) => esc(lang === "ko" && i.k ? i.k : i.n);
+const what = (i) => esc(lang === "ko" ? i.wk || i.we : i.we || i.wk);
+const t = () => T[lang];
+// Subcategory title, shortened to the part before ": " (the rest says how it comes back, which the README explains).
+const grpTitle = (s, g) => {
+  const r = (index.groups || []).find((x) => x[0] === s && x[1] === g);
+  return r ? esc((lang === "ko" ? r[3] : r[2]).split(": ")[0]) : esc(g || (lang === "ko" ? "기타" : "Other"));
+};
+
+function badges(d) {
+  if (!d.added && !d.removed && !d.changed) return `<span class="mute">·</span>`;
+  return [d.added && `<span class="add">+${d.added}</span>`, d.removed && `<span class="rem">−${d.removed}</span>`, d.changed && `<span class="chg">~${d.changed}</span>`].filter(Boolean).join("");
+}
+
+function renderNav(cur) {
+  document.getElementById("days").innerHTML = index.days.map((d) =>
+    `<li><a href="#${d.date}"${d.date === cur ? ' aria-current="page"' : ""}><span>${d.date}</span><span class="badges">${badges(d)}</span></a></li>`).join("");
+  const ol = document.getElementById("days");
+  const a = ol.querySelector("[aria-current]");
+  if (a) ol.scrollTop = a.parentElement.offsetTop - (ol.clientHeight - a.offsetHeight) / 2;
+}
+
+function row(i, cls, tag) {
+  return `<li><span class="tag ${cls}">${tag}</span><span>${cls === "rem" ? "" : DEC[i.d] || ""} ${nm(i)} <span class="what">${what(i)}</span></span><span class="grp">${t().sec[i.s] || i.s} · ${grpTitle(i.s, i.g)}</span></li>`;
+}
+
+function renderDay(f) {
+  const L = t();
+  current = f;
+  const stats = ["total", "keep", "drop", "ask"].map((k) =>
+    `<button type="button" class="stat${k === "total" ? " all" : ""}" data-f="${k}" aria-controls="list" aria-pressed="${k === "total" ? !filter : filter === k}"><b>${f.counts[k] || 0}</b><span>${L[k]}</span>${k === "total" ? `<small class="tot">${L.tot}</small>` : ""}</button>`).join("");
+  const ch = [...f.added.map((i) => row(i, "add", "+ " + L.added)), ...f.removed.map((i) => row(i, "rem", "− " + L.removed)),
+    ...f.changed.map((i) => row(i, "chg", `${DEC[i.from]}→${DEC[i.d]} ${L.changed}`))].join("");
+  document.getElementById("day").innerHTML =
+    `<section class="card"><h2>${f.date}</h2><div class="stats" role="group" aria-label="${L.filter}">${stats}</div><p class="hint">${L.hint}</p><p class="sr" id="status" role="status"></p></section>` +
+    `<section class="card"><h2>${L.changes}</h2>${f.first ? `<p class="mute">${L.first}</p>` : ch ? `<ul class="rows">${ch}</ul>` : `<p class="mute">${L.none}</p>`}</section>` +
+    `<section class="card" id="list"></section>`;
+  renderList();
+}
+
+// The whole list, only the pressed kind when a filter is on (sections then open, so the rows are visible right away).
+function renderList() {
+  const L = t(), f = current;
+  const items = filter ? f.items.filter((i) => i.d === filter) : f.items;
+  const bySec = {};
+  for (const i of items) {
+    bySec[i.s] = bySec[i.s] || [];
+    bySec[i.s].push(i);
+  }
+  const order = (index.groups || []).map((x) => x[0] + "/" + x[1]);
+  const rank = (i) => { const n = order.indexOf(i.s + "/" + i.g); return n < 0 ? order.length : n; };
+  const list = Object.keys(L.sec).filter((s) => bySec[s]).map((s) => {
+    const subs = [];
+    for (const i of [...bySec[s]].sort((a, b) => rank(a) - rank(b))) {
+      if (!subs.length || subs[subs.length - 1].g !== i.g) subs.push({ g: i.g, items: [] });
+      subs[subs.length - 1].items.push(i);
+    }
+    return `<details${filter ? " open" : ""}><summary>${L.sec[s]}<span class="mute">${bySec[s].length}</span></summary>${subs.map((sub) =>
+      `<h3 class="sub">${grpTitle(s, sub.g)}<span class="mute">${sub.items.length}</span></h3><ul class="rows">${sub.items.map((i) =>
+        `<li><span class="tag">${DEC[i.d]}</span><span>${nm(i)} <span class="what">${what(i)}</span></span></li>`).join("")}</ul>`).join("")}</details>`;
+  }).join("");
+  const head = filter ? `${L.list} · ${L[filter]}<span class="mute">${L.shown(items.length, f.items.length)}</span>` : L.list;
+  document.getElementById("list").innerHTML =
+    `<h2>${head}</h2>${list || `<p class="mute">${L.empty}</p>`}`;
+  return filter ? `${L[filter]}: ${L.shown(items.length, f.items.length)}` : `${L.tot}: ${f.items.length} ${L.total}`;
+}
+
+// Press a count to filter the list; press it again (or the total) to show everything.
+document.getElementById("day").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-f]");
+  if (!b) return;
+  const k = b.dataset.f;
+  filter = k === "total" || filter === k ? null : k;
+  for (const x of document.querySelectorAll("button[data-f]"))
+    x.setAttribute("aria-pressed", String(x.dataset.f === "total" ? !filter : x.dataset.f === filter));
+  document.getElementById("status").textContent = renderList();
+});
+
+async function show() {
+  const date = location.hash.slice(1) || index.days[0].date;
+  renderNav(date);
+  cache[date] ||= await fetch(`data/${date}.json`).then((r) => r.json());
+  renderDay(cache[date]);
+}
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  for (const e of document.querySelectorAll("[data-t]")) e.textContent = t()[e.dataset.t];
+  document.title = t().title;
+  document.getElementById("lang").textContent = t().other;
+  document.getElementById("foot").textContent = `${t().note} ${t().updated}: ${new Date(index.updated).toLocaleString(lang)}`;
+}
+
+document.getElementById("lang").onclick = () => { lang = lang === "ko" ? "en" : "ko"; localStorage.setItem("lang", lang); applyLang(); show(); };
+addEventListener("hashchange", show);
+fetch("data/index.json", { cache: "no-cache" }).then((r) => r.json()).then((j) => { index = j; applyLang(); show(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+title = "lazymac"
+
+[extend]
+useDefault = true
+
+# The only allowed exception: the age-encrypted bundle is ciphertext, not a secret value.
+[[allowlists]]
+description = "age-encrypted secrets bundle"
+paths = ['''^secrets/[^/]+\.age$''']

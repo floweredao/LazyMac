@@ -1,0 +1,2 @@
+# Add Rust tooling
++ group cli/rust

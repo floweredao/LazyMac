@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>local.lazymac-daily</string>
+<!-- launched through bun: /bin/zsh started by launchd has no access to ~/Documents (TCC); bun does, and its child zsh inherits it -->
+<key>ProgramArguments</key><array><string>/Users/USER/.bun/bin/bun</string><string>exec</string><string>/bin/zsh /Users/USER/Documents/omo/lazymac/bin/daily.sh</string></array>
+<key>WorkingDirectory</key><string>/Users/USER/Documents/omo/lazymac</string>
+<key>EnvironmentVariables</key><dict>
+  <key>HOME</key><string>/Users/USER</string>
+  <key>PATH</key><string>/opt/homebrew/bin:/opt/homebrew/sbin:/Users/USER/.bun/bin:/Users/USER/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+</dict>
+<key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+<key>ProcessType</key><string>Background</string>
+<key>LowPriorityIO</key><true/>
+<key>StandardOutPath</key><string>/Users/USER/Library/Logs/lazymac-daily/launchd.log</string>
+<key>StandardErrorPath</key><string>/Users/USER/Library/Logs/lazymac-daily/launchd.log</string>
+</dict></plist>
