@@ -2,10 +2,9 @@
 # Shared storage configuration and non-deleting data synchronization. Safe to source.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/Library/Application Support/lazymac/bin:$PATH"
 STORAGE=${LAZYMAC_STORAGE_CONF:-$HOME/Library/Application Support/lazymac/storage.conf}
-# Backups go to a local folder (for example on an external disk) unless storage.conf says "backend gdrive"
-# (Google Drive through rclone). A storage.conf without a backend line that names a remote and no local
-# folder is from before local was the default, so it keeps meaning Google Drive.
-BACKEND= STORAGE_REMOTE=gdrive:LazyMac LOCAL= FILES=off DATA=$HOME/LazyMac-data STORAGE_REMOTE_SET=0
+# Backups go to Google Drive (through rclone) unless storage.conf says "backend local" (a folder, for example
+# on an external disk). A storage.conf without a backend line means Google Drive, unless it names a local folder.
+BACKEND= STORAGE_REMOTE=gdrive:LazyMac LOCAL= FILES=off DATA=$HOME/LazyMac-data
 if [[ -f $STORAGE ]]; then
   while IFS= read -r line || [[ -n $line ]]; do
     read -r key val <<< "$line"
@@ -13,7 +12,7 @@ if [[ -f $STORAGE ]]; then
     [[ $val == "~" || $val == "~/"* ]] && val=$HOME${val#\~}
     case $key in
       backend) BACKEND=$val ;;
-      remote) STORAGE_REMOTE=$val STORAGE_REMOTE_SET=1 ;;
+      remote) STORAGE_REMOTE=$val ;;
       local) LOCAL=$val ;;
       files) FILES=$val ;;
       data) DATA=$val ;;
@@ -21,8 +20,8 @@ if [[ -f $STORAGE ]]; then
   done < "$STORAGE"
 fi
 if [[ -z $BACKEND ]]; then
-  BACKEND=local
-  (( STORAGE_REMOTE_SET )) && [[ -z $LOCAL ]] && BACKEND=gdrive
+  BACKEND=gdrive
+  [[ -n $LOCAL ]] && BACKEND=local
 fi
 # The settings files bin/settings.sh saves into dotfiles/ and `setup.sh dotfiles` puts back (ssh/ is ~/.ssh/).
 DOTFILES=(.zshrc .zshenv .zprofile .gitconfig .tmux.conf .npmrc ssh/config)

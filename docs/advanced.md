@@ -18,7 +18,7 @@ local /Volumes/Backup/LazyMac
 files off
 ```
 
-- `backend local|gdrive`: `local` (the default) copies to a folder or external disk and never needs rclone. `gdrive` uses Google Drive through rclone: install it with `brew install rclone` and create a remote with `rclone config` (Settings > Backup Place shows these steps). A file with a `remote` line and no `backend` line still means `gdrive`.
+- `backend gdrive|local`: `gdrive` (the default) uses Google Drive through rclone: install it with `brew install rclone` and create a remote with `rclone config` (the welcome window and Settings > Backup Place show these steps). `local` copies to a folder or external disk and never needs rclone. A file with no `backend` line means `gdrive`, unless it has a `local` line.
 - `remote <remote:path>`: the rclone remote and folder path (for example `gdrive:LazyMac` or `gdrive:LazyMac/Alexs-MacBook-Pro`).
 - `local <path>`: the local destination folder when using a local backend.
 - `files on|off`: turns scheduled folder and project backup on or off in `bin/daily.sh`. The default is `off`.

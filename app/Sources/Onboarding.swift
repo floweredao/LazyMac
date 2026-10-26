@@ -49,6 +49,7 @@ struct OnboardingView: View {
     @State private var hasBackup = false
     @State private var working = false
     @State private var startedBackup = false
+    @State private var connecting = false
 
     private var place: StorageConfig.Place? { storage.config.place }
     private var placeReady: Bool {
@@ -72,9 +73,11 @@ struct OnboardingView: View {
         .frame(width: 620, height: 540)
         .consoleSheet()
         .task(id: storage.config.target) {
+            StorageConfig.saveDefaultsIfMissing()
             backup.refresh()
             hasBackup = await storage.placeHasBackup()
         }
+        .onChange(of: backup.job) { if backup.job == nil { storage.reload() } }
         .onDisappear(perform: finish)
     }
 
@@ -85,23 +88,23 @@ struct OnboardingView: View {
         case .welcome:
             PageBody(symbol: "laptopcomputer.and.arrow.down",
                      title: tr("Welcome to LazyMac", "LazyMac에 오신 걸 환영해요"),
-                     text: tr("LazyMac remembers how your Mac is set up, so a new or erased Mac can be set up the same way again.",
-                              "LazyMac은 맥을 어떻게 꾸며 두었는지 기억해 두었다가, 새 맥이나 초기화한 맥을 똑같이 다시 꾸며 줘요."))
+                     text: tr("LazyMac remembers the apps and tools on this Mac.\nOn your next Mac, it installs them again, clean.\nOld files and leftovers stay behind.",
+                              "LazyMac은 이 맥에 깔린 앱과 도구를 기억해요.\n다음 맥에는 그것을 깨끗하게 새로 설치해요.\n묵은 파일과 찌꺼기는 옮기지 않아요."))
         case .apps:
             PageBody(symbol: "square.grid.2x2",
                      title: tr("Your apps and tools", "앱과 도구"),
-                     text: tr("LazyMac lists the apps and command-line tools on this Mac. On a new Mac it installs the ones you pick.",
-                              "이 맥에 있는 앱과 명령줄 도구 목록을 만들어요. 새 맥에서는 고른 것만 설치해요."))
+                     text: tr("LazyMac lists the apps and command-line tools on this Mac.\nOn the new Mac, it installs only the ones you pick.",
+                              "이 맥에 있는 앱과 명령줄 도구의 목록을 만들어요.\n새 맥에는 그중 고른 것만 설치해요."))
         case .settings:
             PageBody(symbol: "slider.horizontal.3",
-                     title: tr("Your settings and folders", "설정과 폴더"),
-                     text: tr("It saves app settings, your shell setup and the folders you choose, every day if you like.",
-                              "앱 설정, 셸 설정, 고른 폴더를 저장해요. 원하면 매일 자동으로 해요."))
+                     title: tr("Your settings", "설정"),
+                     text: tr("It also saves your shell, Git, Dock and Finder settings.\nCopying folders, like projects, is optional and starts off.\nIt can back up by itself every day.",
+                              "셸, Git, Dock, Finder 설정도 함께 저장해요.\n프로젝트 같은 폴더 복사는 선택이라 처음엔 꺼져 있어요.\n원하면 매일 알아서 백업해요."))
         case .restore:
             PageBody(symbol: "arrow.triangle.2.circlepath",
                      title: tr("Ready for a new Mac", "새 맥도 금방"),
-                     text: tr("When you get a new Mac, open LazyMac there, point it at the same backup place and choose what to bring back.",
-                              "새 맥에서 LazyMac을 열고 같은 백업 장소를 고른 뒤, 되살릴 것을 고르면 돼요."))
+                     text: tr("On the new Mac, open LazyMac and choose the same backup place.\nThen pick what to install.",
+                              "새 맥에서 LazyMac을 열고 같은 백업 장소를 골라요.\n그다음 설치할 것을 고르면 돼요."))
         case .place: placePage
         case .backup: backupPage
         case .passwords: passwordsPage
@@ -116,38 +119,71 @@ struct OnboardingView: View {
         }
     }
 
+    private var drive: Bool { storage.config.backend == .gdrive }
+
     private var placePage: some View {
-        PageBody(symbol: "externaldrive",
+        PageBody(symbol: drive ? "icloud.and.arrow.up" : "externaldrive",
                  title: tr("Choose where backups go", "백업을 둘 곳 고르기"),
-                 text: tr("A folder on an external disk is safest: the backup stays safe even if this Mac breaks. Any folder works.",
-                          "외장 디스크의 폴더가 가장 안전해요. 이 맥이 고장 나도 백업은 남으니까요. 어느 폴더든 괜찮아요.")) {
+                 text: drive
+                    ? tr("Backups go to Google Drive unless you choose a folder.\nYour new Mac can get them from anywhere.",
+                         "폴더를 고르지 않으면 Google 드라이브에 백업해요.\n새 맥에서 어디서든 가져올 수 있어요.")
+                    : tr("Backups go to the folder you choose.\nOn an external disk, they stay safe even if this Mac breaks.",
+                         "고른 폴더에 백업해요.\n외장 디스크 폴더라면 이 맥이 고장 나도 남아요.")) {
             VStack(spacing: Space.l) {
-                if let place, placeReady {
-                    StatusLabel(kind: .ok, text: place.sentence)
-                } else if let place, place.drive {
-                    StatusLabel(kind: .problem, text: tr("Google Drive is not connected yet. Finish the steps in Settings.", "Google 드라이브가 아직 연결되지 않았어요. 설정에서 남은 단계를 마쳐 주세요."))
-                } else if let place, !place.connected {
-                    StatusLabel(kind: .problem, text: tr("The disk “\(place.disk ?? "")” is not connected. Connect it, or choose another folder.", "“\(place.disk ?? "")” 디스크가 연결되어 있지 않아요. 디스크를 연결하거나 다른 폴더를 골라 주세요."))
-                }
-                Button(placeReady ? tr("Choose Another Folder…", "다른 폴더 고르기…") : tr("Choose Folder…", "폴더 고르기…")) {
-                    storage.chooseFolder()
-                }
-                .controlSize(.large)
-                .fixedSize()
-                Button(place?.drive == true ? tr("Open Google Drive Settings…", "Google 드라이브 설정 열기…") : tr("Use Google Drive Instead…", "Google 드라이브 쓰기…")) {
-                    if place?.drive != true {
-                        storage.config.backend = .gdrive
-                        storage.save()
-                    }
-                    SettingsTab.open(.place, openSettings)
-                }
-                .buttonStyle(.link)
-                .fixedSize()
-                Text(tr("Google Drive uses rclone, which LazyMac can install for you.", "Google 드라이브는 rclone을 써요. LazyMac이 설치해 줄 수 있어요."))
-                    .font(AppText.caption)
-                    .foregroundStyle(.secondary)
+                if drive { drivePlace } else { folderPlace }
             }
         }
+        .sheet(isPresented: $connecting) { ConnectSheet().environment(backup) }
+    }
+
+    @ViewBuilder private var drivePlace: some View {
+        if let place, placeReady {
+            StatusLabel(kind: .ok, text: place.sentence)
+        } else if backup.rclonePath == nil {
+            StatusLabel(kind: .info, text: tr("Step 1: Install rclone, a free tool that copies files to Google Drive.",
+                                              "1단계: Google 드라이브로 파일을 복사하는 무료 도구 rclone을 설치해요."))
+            Button(tr("Install rclone", "rclone 설치")) {
+                backup.installRclone()
+                consoleSheet.wrappedValue = true
+            }
+            .controlSize(.large)
+            .disabled(backup.busy)
+            .fixedSize()
+        } else {
+            StatusLabel(kind: .info, text: tr("Step 2: Connect your Google Drive account.", "2단계: Google 드라이브 계정을 연결해요."))
+            Button(tr("Connect Google Drive…", "Google 드라이브 연결…")) { connecting = true }
+                .controlSize(.large)
+                .disabled(backup.busy)
+                .fixedSize()
+            Text(tr("Your browser opens so you can sign in to Google.\nrclone can see only the files LazyMac makes.",
+                    "브라우저가 열리면 Google에 로그인해요.\nrclone은 LazyMac이 만든 파일만 볼 수 있어요."))
+                .font(AppText.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        Button(tr("Use a Folder Instead…", "대신 폴더 쓰기…")) { storage.chooseFolder() }
+            .buttonStyle(.link)
+            .fixedSize()
+    }
+
+    @ViewBuilder private var folderPlace: some View {
+        if let place, placeReady {
+            StatusLabel(kind: .ok, text: place.sentence)
+        } else if let place, !place.connected {
+            StatusLabel(kind: .problem, text: tr("The disk “\(place.disk ?? "")” is not connected. Connect it, or choose another folder.", "“\(place.disk ?? "")” 디스크가 연결되어 있지 않아요. 디스크를 연결하거나 다른 폴더를 골라 주세요."))
+        }
+        Button(placeReady ? tr("Choose Another Folder…", "다른 폴더 고르기…") : tr("Choose Folder…", "폴더 고르기…")) {
+            storage.chooseFolder()
+        }
+        .controlSize(.large)
+        .fixedSize()
+        Button(tr("Use Google Drive Instead", "Google 드라이브 쓰기")) {
+            storage.setBackend(.gdrive)
+            backup.refresh()
+        }
+        .buttonStyle(.link)
+        .fixedSize()
     }
 
     private var backupPage: some View {

@@ -3,9 +3,9 @@ import Foundation
 import Observation
 
 struct StorageConfig: Equatable {
-    /// local: a folder the user picks (an external disk, say), no extra tools. gdrive: Google Drive through rclone.
+    /// gdrive (the default): Google Drive through rclone. local: a folder the user picks (an external disk, say).
     enum Backend: String, CaseIterable { case local, gdrive }
-    var backend: Backend = .local
+    var backend: Backend = .gdrive
     var remote = "gdrive:LazyMac"
     var local = ""
     var files = false
@@ -21,21 +21,27 @@ struct StorageConfig: Equatable {
     /// Reads storage.conf the way bin/storage.sh does, including its rule for a file with no backend line.
     static func load() -> StorageConfig {
         var c = StorageConfig()
-        var sawBackend = false, sawRemote = false
+        var sawBackend = false
         for line in ((try? String(contentsOf: url, encoding: .utf8)) ?? "").components(separatedBy: "\n") {
             let parts = line.split(maxSplits: 1, whereSeparator: \.isWhitespace).map(String.init)
             guard parts.count == 2 else { continue }
             switch parts[0] {
             case "backend": c.backend = Backend(rawValue: parts[1]) ?? .local; sawBackend = true
-            case "remote": c.remote = parts[1]; sawRemote = true
+            case "remote": c.remote = parts[1]
             case "local": c.local = BackupConfig.expand(parts[1])
             case "files": c.files = parts[1] == "on"
             case "data": c.data = BackupConfig.expand(parts[1])
             default: break
             }
         }
-        if !sawBackend { c.backend = sawRemote && c.local.isEmpty ? .gdrive : .local }
+        if !sawBackend { c.backend = c.local.isEmpty ? .gdrive : .local }
         return c
+    }
+
+    /// Writes the defaults (Google Drive, folder backup off) for a new user, so the app and the scripts read the
+    /// same place before anything is chosen.
+    static func saveDefaultsIfMissing() {
+        if !exists { try? StorageConfig().save() }
     }
 
     var dataURL: URL {

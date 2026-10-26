@@ -68,6 +68,13 @@ check "storage.conf selects the data folder when the environment is unset" \
   '[[ $(env -u LAZYMAC_DATA zsh "$REPO/bin/storage.sh" path) == "$TMP/data" ]]'
 check "LAZYMAC_DATA overrides the configured data folder" \
   '[[ $(LAZYMAC_DATA="$TMP/override" zsh "$REPO/bin/storage.sh" path) == "$TMP/override" ]]'
+# A new user (no storage.conf, or one without backend and local lines) backs up to Google Drive with folders off.
+check "no storage.conf means Google Drive" '[[ $(LAZYMAC_STORAGE_CONF="$TMP/none.conf" zsh "$REPO/bin/storage.sh" target) == gdrive:LazyMac ]]'
+check "no storage.conf keeps folder backup off" '[[ $(LAZYMAC_STORAGE_CONF="$TMP/none.conf" zsh -c "source \"$REPO/bin/storage.sh\"; print \$FILES") == off ]]'
+printf 'data %s\n' "$LAZYMAC_DATA" > "$TMP/data-only.conf"
+check "storage.conf without backend or local means Google Drive" '[[ $(LAZYMAC_STORAGE_CONF="$TMP/data-only.conf" zsh "$REPO/bin/storage.sh" target) == gdrive:LazyMac ]]'
+printf 'remote gdrive:Old\nlocal %s\n' "$TMP/storage" > "$TMP/local-only.conf"
+check "storage.conf with a local folder and no backend stays local" '[[ $(LAZYMAC_STORAGE_CONF="$TMP/local-only.conf" zsh "$REPO/bin/storage.sh" target) == "$TMP/storage" ]]'
 printf 'backend local\nlocal %s\nfiles on\ndata %s\n' "$TMP/storage" "$LAZYMAC_DATA" > "$LAZYMAC_STORAGE_CONF"
 daily
 check "files on enables folder copying and comparison in daily" \

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# A Mac without rclone and the default local backend: the daily backup (scan, list, settings, copy) and the
+# A Mac without rclone that backs up to a local folder: the daily backup (scan, list, settings, copy) and the
 # restore of the app list into a new data folder must work, through the scripts and through the app. PATH has
 # no rclone, and every run is inside a sandbox that refuses to start any program named rclone, so a stray
 # rclone call fails the test even on a Mac that has rclone installed. Fake data under .work/ only.
@@ -83,6 +83,6 @@ check "an unplugged backup disk stops the backup and says so" \
 printf 'remote gdrive:Old\n' > "$TMP/old.conf"
 check "an older storage.conf that names only a remote still means Google Drive" \
   '[[ $(LAZYMAC_STORAGE_CONF=$TMP/old.conf zsh "$REPO/bin/storage.sh" target) == gdrive:Old ]]'
-check "without storage.conf, LazyMac asks for a folder instead of using Google Drive" \
-  '! LAZYMAC_STORAGE_CONF=$TMP/none.conf zsh "$REPO/bin/storage.sh" target 2>"$TMP/err" && grep -q "Choose a storage destination" "$TMP/err"'
+check "without storage.conf, a new Mac backs up to Google Drive" \
+  '[[ $(LAZYMAC_STORAGE_CONF=$TMP/none.conf zsh "$REPO/bin/storage.sh" target) == gdrive:LazyMac ]]'
 exit $fail
