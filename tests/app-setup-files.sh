@@ -13,10 +13,16 @@ TMP=$(mktemp -d "$REPO/.work/app-setup.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 source "$REPO/tests/fixtures.zsh"
 seed_data
+# Two rows name the same repo (cloned once) and one takes the default folder: how=repo becomes setup/repos.tsv.
+printf 'cli\ttools\t%s\t%s\t\tkeep\trepo\t%s\tA repo\t저장소\tExample only\t예제 전용\n' \
+  example-repo 'Example repo' 'example/repo#~/.local/share/repo#make install' \
+  example-repo-cli 'Example repo CLI' 'example/repo' \
+  example-other 'Example other' 'example/other' >> "$LAZYMAC_DATA/catalog.tsv"
+bun "$REPO/bin/catalog.ts" render >/dev/null
 fail=0
 same() {
   local want=$1 got=$2 label=$3 f
-  for f in Brewfile npm.txt bun.txt scripts.tsv releases.tsv downloads.tsv jobs.txt versions.env; do
+  for f in Brewfile npm.txt bun.txt scripts.tsv releases.tsv repos.tsv downloads.tsv jobs.txt versions.env; do
     if diff <(grep -v '^# Generated' "$want/$f") <(grep -v '^# Generated' "$got/$f") >/dev/null; then
       print "ok      $label $f"
     else

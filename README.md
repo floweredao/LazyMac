@@ -102,7 +102,7 @@ LazyMac installs a LaunchAgent (`local.lazymac-daily`) that runs the same backup
 - **Sign in again** to apps that tie sign-ins to the Mac's hardware: browsers, chat and mail apps, password managers, and VPNs.
 - When macOS asks whether an app may use a restored Keychain item, choose **Always Allow**.
 
-To check what is still missing, run `bin/setup.sh check` in Terminal. It lists every item on your list that is not on this Mac.
+To check what is still missing, run `/Applications/LazyMac.app/Contents/Resources/bin/setup.sh check` in Terminal (or `bin/setup.sh check` in a copy of this repo). It lists every item on your list that is not on this Mac.
 
 ### Restore from Terminal
 

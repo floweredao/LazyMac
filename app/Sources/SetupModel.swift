@@ -40,7 +40,7 @@ final class SetupModel {
     var page: Page = .overview
     var stage: Stage = .prepare
     var selected: Set<String> = []
-    var extraSteps: Set<Step> = [.dotfiles, .secrets, .repos, .check]
+    var extraSteps: Set<Step> = [.dotfiles, .secrets, .check]
     var showLeftBehind = false
     var search = ""
 
@@ -149,7 +149,7 @@ final class SetupModel {
 
     func resetSelection() {
         selected = Set(selectableRows.filter { $0.decision == .keep }.map(\.id))
-        extraSteps = [.dotfiles, .secrets, .repos, .check]
+        extraSteps = [.dotfiles, .secrets, .check]
         baseProfile = nil
         addOns = []
         profileError = nil

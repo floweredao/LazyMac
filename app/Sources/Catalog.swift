@@ -82,7 +82,7 @@ enum Step: String, CaseIterable, Identifiable {
 
     var hasItems: Bool {
         switch self {
-        case .dotfiles, .secrets, .repos, .check: false
+        case .dotfiles, .secrets, .check: false
         default: true
         }
     }
@@ -95,6 +95,7 @@ enum Step: String, CaseIterable, Identifiable {
         case "uv-python": .python
         case "script": .scripts
         case "release": .releases
+        case "repo": .repos
         case "register": .jobs
         case "download", "build": .downloads
         default: nil
@@ -133,6 +134,7 @@ struct CatalogRow: Identifiable, Hashable {
         case "nvm": "nvm"
         case "script": tr("install script", "설치 스크립트")
         case "release": tr("GitHub release", "GitHub 릴리즈")
+        case "repo": tr("Git repo", "Git 저장소")
         case "register": tr("background", "백그라운드")
         case "download", "build": tr("download", "직접 받기")
         default: how
@@ -253,8 +255,24 @@ enum Catalog {
                 let pattern = parts.count > 1 && !parts[1].isEmpty ? parts[1] : "-"
                 return "\(r.name)\t\(parts[0])\t\(pattern)\t\(installedPath(r))"
             },
+            "repos.tsv": head + repoLines(of("repo").map(\.ref)).joined(separator: "\n") + "\n",
             "versions.env": "\(head)NODE_VERSION=\(version("nvm"))\nPYTHON_VERSION=\(version("uv-python"))\n",
         ]
+    }
+
+    /// how=repo ref `owner/repo[#folder[#install command]]` -> `owner/repo<TAB>folder<TAB>command` (bin/catalog.ts repoLines).
+    static func repoLines(_ refs: [String]) -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for ref in refs {
+            let parts = ref.split(separator: "#", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+            let repo = parts[0]
+            guard !repo.isEmpty, seen.insert(repo).inserted else { continue }
+            let folder = parts.count > 1 && !parts[1].isEmpty ? parts[1] : "~/Documents/\(repo.split(separator: "/").last ?? "")"
+            let command = parts.count > 2 && !parts[2].isEmpty ? parts[2] : "-"
+            out.append("\(repo)\t\(folder)\t\(command)")
+        }
+        return out
     }
 
     static func installedPath(_ r: CatalogRow) -> String {

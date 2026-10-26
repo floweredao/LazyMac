@@ -92,5 +92,5 @@ tests/app-setup-files.sh            # 앱이 만드는 목록이 setup/·catalog
 tests/app-schedule.sh               # 자동 백업 일정이 LaunchAgent에 그대로 들어가는지 (임시 폴더에서)
 # app/VERSION 올리기 (화면·동작 추가 1.x.0, 버그 수정 1.0.x)
 app/build.sh                        # app/build/LazyMac-<버전>.zip
-gh release create app-v$(cat app/VERSION) app/build/LazyMac-$(cat app/VERSION).zip -R floweredao/LazyMac --title "LazyMac App $(cat app/VERSION)"
+gh release create v$(cat app/VERSION) app/build/LazyMac-$(cat app/VERSION).zip -R floweredao/LazyMac --title "LazyMac $(cat app/VERSION)"
 ```

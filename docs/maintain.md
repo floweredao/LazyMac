@@ -43,7 +43,7 @@ Never edit `setup/` or the generated marker blocks of the READMEs by hand; edit 
 | `name`, `name_ko` | Shown in the README (`name_ko` empty = same as `name`) |
 | `decision` | `keep` (bring), `drop` (leave behind), `ask` (undecided; not installed until changed to `keep`) |
 | `how` | How it comes back, see below |
-| `ref` | The value `how` needs: formula, cask, App Store id, package, URL, `owner/repo[#pattern]`, label |
+| `ref` | The value `how` needs: formula, cask, App Store id, package, URL, `owner/repo[#pattern]` (`release`), `owner/repo[#folder[#command]]` (`repo`: where to clone, default `~/Documents/<repo>`, and a command run inside it), label |
 | `what_en`, `what_ko` | What it does, in plain words |
 | `why_en`, `why_ko` | One-line evidence for the decision |
 
@@ -56,7 +56,7 @@ Never edit `setup/` or the generated marker blocks of the READMEs by hand; edit 
 | `bun` | `setup/bun.txt` | `register` | `setup/jobs.txt`, plist from `launchd/` or the bundle |
 | `nvm`, `uv-python` | `setup/versions.env` | `with-app`, `with-tool` | installing `ref` |
 | `bun-install`, `script` | official install script | `restore` | its own restore guide |
-| `release` | `setup/releases.tsv` (`gh release download`) | `repo` | `setup.sh repos` |
+| `release` | `setup/releases.tsv` (`gh release download`) | `repo` | `setup/repos.tsv` (`setup.sh repos`) |
 | `download`, `build` | `setup/downloads.tsv` (page opened) | `byhand`, `signin` | the user (`setup/byhand.tsv`) |
 | `none` | nothing (`drop`) | | |
 

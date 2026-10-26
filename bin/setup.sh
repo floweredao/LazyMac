@@ -10,8 +10,11 @@
 #                                `bun bin/catalog.ts profile` into .work/profile-<names>/); without steps it runs
 #                                every step except the ones the profile skips
 #        bin/setup.sh --list     show the steps
+#        bin/setup.sh --dry-run [step...]
+#                                show what each step would install or change, without doing it
 #        bin/setup.sh --release-asset <owner/repo> [pattern]
 #                                print the latest release tag and the file this Mac would install
+# Without a GitHub sign-in (a new Mac), public repos and releases come through the public GitHub API.
 # LAZYMAC_SETUP_DIR=<dir> reads the lists from <dir> instead of setup/ (the lazymac app writes
 # the items you picked there, in the same format).
 set -u
@@ -20,10 +23,15 @@ source "$REPO/bin/storage.sh"
 S=${LAZYMAC_SETUP_DIR:-$DATA/setup}
 export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.bun/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export HOMEBREW_NO_ENV_HINTS=1
+# Scratch files go next to the code, or to the cache folder when the code is inside LazyMac.app.
+WORK=$REPO/.work
+[[ $REPO == *.app/Contents/* ]] && WORK=$HOME/Library/Caches/lazymac
+DRY=0
+[[ ${1:-} == --dry-run ]] && { DRY=1; shift; }
 if [[ ${1:-} == --profile ]]; then
   [[ -n ${2:-} ]] || { print -u2 "usage: setup.sh --profile <base[,add-on...]> [step...]"; exit 2; }
   command -v bun >/dev/null || { print -u2 "--profile needs bun (curl -fsSL https://bun.sh/install | bash)"; exit 2; }
-  S=$REPO/.work/profile-${2//,/-}
+  S=$WORK/profile-${2//,/-}
   bun "$REPO/bin/catalog.ts" profile "$2" "$S" || exit 2
   shift 2
 fi
@@ -40,13 +48,15 @@ typeset -A ABOUT=(
   releases  "apps from the latest GitHub release of their repo (.dmg or .zip)"
   dotfiles  "shell, git, tmux, npm and ssh settings from dotfiles/, and the Dock settings in dotfiles/macos-defaults.tsv"
   secrets   "sign-ins, API keys, private job files and scripts from the encrypted bundle (asks the passphrase)"
-  repos     "my-skills and devin-vm"
+  repos     "the other projects (Git repos) in setup/repos.tsv, cloned and set up"
   jobs      "register the background jobs marked keep (only when their program is in place)"
   downloads "open the download page of each app that has no Homebrew package"
   check     "list what is still missing"
 )
 
-lines() { grep -v '^#' "$1" | grep -v '^[[:space:]]*$'; }
+lines() { [[ -f $1 ]] || return 0; grep -v '^#' "$1" | grep -v '^[[:space:]]*$'; }
+# gh works only after "gh auth login"; until then (a new Mac) public repos are read without it.
+gh_ok() { command -v gh >/dev/null && gh auth status >/dev/null 2>&1; }
 say() { print -r -- "$*"; }
 
 step_brew() {
@@ -94,7 +104,13 @@ step_scripts() {
 release_asset() {
   local repo=$1 pattern=${2:--} out tag n
   local -a names picks
-  out=$(gh release view -R "$repo" --json tagName,assets --jq '.tagName, .assets[].name') || return 1
+  if gh_ok; then
+    out=$(gh release view -R "$repo" --json tagName,assets --jq '.tagName, .assets[].name') || return 1
+  else
+    out=$(curl -fsSL -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$repo/releases/latest" \
+      | /usr/bin/jq -r '.tag_name, .assets[].name') && [[ -n $out ]] \
+      || { print -u2 "could not read the latest release of $repo (a private repo needs: gh auth login)"; return 1; }
+  fi
   names=( ${(f)out} )
   tag=${names[1]}
   names=( ${names[2,-1]} )
@@ -134,6 +150,12 @@ install_app() {
   esac
 }
 
+download_asset() {
+  local repo=$1 tag=$2 asset=$3 dir=$4
+  if gh_ok; then gh release download "$tag" -R "$repo" -p "$asset" -D "$dir"
+  else curl -fsSL -o "$dir/$asset" "https://github.com/$repo/releases/download/$tag/$asset"; fi
+}
+
 step_releases() {
   local name repo pattern check pick tag asset work rc=0
   local -a hits
@@ -145,7 +167,7 @@ step_releases() {
     tag=${pick%%$'\t'*} asset=${pick#*$'\t'}
     say "install $name $tag ($asset)"
     work=$(mktemp -d "${TMPDIR:-/tmp}/lazymac-release.XXXXXX")
-    if gh release download "$tag" -R "$repo" -p "$asset" -D "$work" && mkdir -p "${check:h}" \
+    if download_asset "$repo" "$tag" "$asset" "$work" && mkdir -p "${check:h}" \
         && install_app "$work/$asset" "$work" "$check"; then
       say "ok      $name"
     else
@@ -186,16 +208,28 @@ step_secrets() {
   [[ -z $("$HOME/.bun/bin/bun" "$REPO/bin/omo-anthropic.ts" list 2>/dev/null) ]] || "$HOME/.bun/bin/bun" "$REPO/bin/omo-anthropic.ts" sync
 }
 
+# setup/repos.tsv: <owner/repo> <folder> <command run inside it after cloning, or ->, from catalog rows how=repo.
 step_repos() {
-  local rc=0
-  if [[ ! -d $HOME/.local/share/my-skills/.git ]]; then
-    gh repo clone floweredao/my-skills "$HOME/.local/share/my-skills" || rc=1
-  fi
-  [[ -d $HOME/.local/share/my-skills ]] && { bash "$HOME/.local/share/my-skills/scripts/install.sh" all || rc=1; }
-  if [[ ! -d $HOME/Documents/omo/devin-vm/.git ]]; then
-    mkdir -p "$HOME/Documents/omo" && gh repo clone floweredao/devin-vm "$HOME/Documents/omo/devin-vm" || rc=1
-  fi
-  [[ -d $HOME/Documents/omo/devin-vm ]] && { "$HOME/Documents/omo/devin-vm/install.sh" || say "devin-vm: see the MISSING lines above"; }
+  local repo folder command rc=0 n=0
+  while IFS=$'\t' read -r repo folder command; do
+    n=$((n + 1))
+    folder=${folder/#\~/$HOME}
+    if [[ -d $folder/.git ]]; then
+      say "ok      $repo (${folder/#$HOME/~})"
+    else
+      say "get     $repo -> ${folder/#$HOME/~}"
+      mkdir -p "${folder:h}" || { rc=1; continue; }
+      if gh_ok; then gh repo clone "$repo" "$folder" || { say "failed  $repo"; rc=1; continue; }
+      else
+        GIT_TERMINAL_PROMPT=0 git clone -q "https://github.com/$repo.git" "$folder" \
+          || { say "failed  $repo: a private repo needs a GitHub sign-in first (gh auth login), then run: bin/setup.sh repos"; rc=1; continue; }
+      fi
+    fi
+    [[ $command == - || -z $command ]] && continue
+    if (cd "$folder" && /bin/zsh -c "$command"); then say "ok      $repo: $command"
+    else say "failed  $repo: $command"; rc=1; fi
+  done < <(lines "$S/repos.tsv")
+  (( n )) || say "no other projects in the list"
   return $rc
 }
 
@@ -210,13 +244,21 @@ job_program() {
 }
 
 step_jobs() {
-  local label p missing on=0 added=0 waiting=0 dom=gui/$(id -u)
+  local label p missing app on=0 added=0 waiting=0 dom=gui/$(id -u)
   while read -r label; do
     p=$HOME/Library/LaunchAgents/$label.plist
     if launchctl print "$dom/$label" >/dev/null 2>&1; then say "on      $label"; on=$((on + 1)); continue; fi
     # The daily job runs every day only on the main Mac (machines.tsv); another Mac turns it on in the app.
     if [[ $label == local.lazymac-daily && $(bun "$REPO/bin/catalog.ts" machine 2>/dev/null | cut -f1) != main ]]; then
       say "skip    $label: only the main Mac in machines.tsv runs it; turn on Auto Backup in the LazyMac app instead"; continue
+    fi
+    # The app writes the daily job for this Mac (its paths, catch-up after sleep); the launchd/ copy is only a sample.
+    if [[ $label == local.lazymac-daily && ! -f $p ]]; then
+      app=${REPO:h}/MacOS/lazymac
+      [[ -x $app ]] || app=/Applications/LazyMac.app/Contents/MacOS/lazymac
+      if [[ -x $app ]] && "$app" --schedule daily:04:00 >/dev/null; then say "started $label (every day at 04:00)"; added=$((added + 1))
+      else say "wait    $label: turn on Auto Backup in the LazyMac app"; waiting=$((waiting + 1)); fi
+      continue
     fi
     [[ ! -f $p && -f $REPO/launchd/$label.plist ]] && cp "$REPO/launchd/$label.plist" "$p"
     if [[ ! -f $p ]]; then say "wait    $label: no plist yet (run the secrets step)"; waiting=$((waiting + 1)); continue; fi
@@ -240,10 +282,78 @@ step_downloads() {
 }
 
 step_check() {
-  local out=$REPO/.work/after-setup
+  local out=$WORK/after-setup
   "$REPO/bin/inventory.sh" "$out" >/dev/null && "$HOME/.bun/bin/bun" "$REPO/bin/catalog.ts" check "$out"
   return 0
 }
+
+# --dry-run: what each step would do, read from the same lists; it installs, copies and registers nothing.
+have() { local -a hits; hits=( ${~1}(N) ); (( ${#hits} )); }
+preview_brew() {
+  command -v brew >/dev/null && say "Homebrew is installed" || say "would install Homebrew"
+  local kind n
+  for kind in tap brew cask mas uv; do
+    n=$(grep -c "^$kind " "$S/Brewfile" 2>/dev/null)
+    (( n )) && say "would add $n $kind: $(grep "^$kind " "$S/Brewfile" | sed -E 's/^[a-z]+ "([^"]+)".*/\1/' | tr '\n' ' ')"
+  done
+  return 0
+}
+preview_node() { say "would install Node.js $NODE_VERSION; npm tools: $(lines "$S/npm.txt" | tr '\n' ' ')"; }
+preview_bun() { say "bun tools: $(lines "$S/bun.txt" | tr '\n' ' ')"; }
+preview_python() { say "would install Python $PYTHON_VERSION with uv"; }
+preview_scripts() {
+  local id url
+  while IFS=$'\t' read -r id url; do
+    if command -v "$id" >/dev/null || [[ -d /Applications/$id.app ]]; then say "ok      $id"; else say "would run $url ($id)"; fi
+  done < <(lines "$S/scripts.tsv")
+}
+preview_releases() {
+  local name repo pattern check pick rc=0
+  while IFS=$'\t' read -r name repo pattern check; do
+    check=${check/#\~/$HOME}
+    if have "$check"; then say "ok      $name"; continue; fi
+    if pick=$(release_asset "$repo" "$pattern"); then say "would install $name ${pick%%$'\t'*} (${pick#*$'\t'})"
+    else say "failed  $name: no download found in $repo"; rc=1; fi
+  done < <(lines "$S/releases.tsv")
+  return $rc
+}
+preview_dotfiles() {
+  local f dest
+  for f in $DOTFILES; do
+    [[ -f $DATA/dotfiles/$f ]] || continue
+    dest=$HOME/${f/#ssh\//.ssh/}
+    [[ -f $dest ]] && say "would replace ${dest/#$HOME/~} (the old one is kept)" || say "would copy ${dest/#$HOME/~}"
+  done
+  say "would write $(grep -cv '^#' "$DATA/dotfiles/macos-defaults.tsv" 2>/dev/null || print 0) macOS settings"
+}
+preview_secrets() {
+  local -a bundles; bundles=( "$DATA"/secrets/*.age(N) )
+  (( ${#bundles} )) || { say "no encrypted bundle in ${DATA/#$HOME/~}/secrets: nothing to restore"; return 0; }
+  say "would ask the passphrase and restore $(lines "$DATA/secrets/manifest.txt" | wc -l | tr -d ' ') files from ${bundles[1]:t}"
+}
+preview_repos() {
+  local repo folder command n=0
+  while IFS=$'\t' read -r repo folder command; do
+    n=$((n + 1)); folder=${folder/#\~/$HOME}
+    if [[ -d $folder/.git ]]; then say "ok      $repo"
+    else say "would clone $repo into ${folder/#$HOME/~}$([[ $command != - ]] && print -r -- ", then run: $command")"; fi
+  done < <(lines "$S/repos.tsv")
+  (( n )) || say "no other projects in the list"
+}
+preview_jobs() {
+  local label
+  while read -r label; do
+    launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1 && say "on      $label" || say "would register $label"
+  done < <(lines "$S/jobs.txt")
+}
+preview_downloads() {
+  local name url check
+  while IFS=$'\t' read -r name url check; do
+    check=${check/#\~/$HOME}
+    have "$check" && say "ok      $name" || say "would open $url ($name)"
+  done < <(lines "$S/downloads.tsv")
+}
+preview_check() { say "would scan this Mac and list what is still missing"; }
 
 if [[ ${1:-} == --release-asset ]]; then
   release_asset "${2:?usage: setup.sh --release-asset <owner/repo> [pattern]}" "${3:--}"; exit
@@ -258,7 +368,7 @@ for s in $run; do (( ${STEPS[(Ie)$s]} )) || { print -u2 "unknown step: $s (see -
 failed=()
 for s in $run; do
   say ""; say "== $s: $ABOUT[$s]"
-  step_$s || failed+=$s
+  if (( DRY )); then preview_$s || failed+=$s; else step_$s || failed+=$s; fi
 done
 say ""
 # Apps LazyMac never installs (catalog how=byhand): always say so, whatever steps ran.
@@ -270,4 +380,5 @@ if [[ -f $S/byhand.tsv ]] && [[ -n $(lines "$S/byhand.tsv") ]]; then
   say ""
 fi
 if (( ${#failed} )); then say "Finished with problems in: ${failed[*]}. Fix them and run: bin/setup.sh ${failed[*]}"; exit 1; fi
+(( DRY )) && { say "Dry run: nothing was installed or changed."; exit 0; }
 say "Done. Last by hand: App Store sign-in, privacy permissions, app sign-ins, then the restore guides of tools that have their own."
