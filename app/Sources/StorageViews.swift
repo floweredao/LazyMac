@@ -54,15 +54,15 @@ struct BackupPlaceView: View {
         Form {
             Section {
                 Picker(tr("Keep backups in", "백업을 둘 곳"), selection: backend) {
-                    Text(tr("A folder on this Mac or an external disk (recommended)", "이 맥이나 외장 디스크의 폴더 (권장)"))
-                        .tag(StorageConfig.Backend.local)
-                    Text(tr("Google Drive", "Google 드라이브"))
+                    Text(tr("Google Drive (recommended)", "Google 드라이브 (권장)"))
                         .tag(StorageConfig.Backend.gdrive)
+                    Text(tr("A folder on this Mac or an external disk", "이 맥이나 외장 디스크의 폴더"))
+                        .tag(StorageConfig.Backend.local)
                 }
                 .pickerStyle(.radioGroup)
             } footer: {
-                FooterText(tr("A folder on an external disk works right away with no extra tools or sign-in. Google Drive keeps an off-site copy in the cloud.",
-                              "외장 디스크 폴더는 추가 도구나 로그인 없이 바로 쓸 수 있어요. Google 드라이브는 클라우드에 따로 보관해요."))
+                FooterText(tr("Google Drive keeps your backup off this Mac, so a new Mac can get it from anywhere.\nA folder on an external disk needs no extra tools or sign-in.",
+                              "Google 드라이브는 백업을 이 맥 밖에 둬서, 새 맥에서 어디서든 가져올 수 있어요.\n외장 디스크 폴더는 추가 도구나 로그인 없이 쓸 수 있어요."))
             }
 
             if storage.config.backend == .local {

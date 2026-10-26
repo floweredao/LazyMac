@@ -462,10 +462,15 @@ struct FirstRunView: View {
     @State private var working = false
 
     private var place: StorageConfig.Place? { storage.config.place }
+    private var drive: Bool { storage.config.backend == .gdrive }
     private var placeReady: Bool {
         guard let place else { return false }
         if place.drive { return backup.rclonePath != nil && backup.remotes.contains(backup.config.remoteName) }
         return place.connected
+    }
+
+    private func choosePlace() {
+        if drive { SettingsTab.open(.place, openSettings) } else { storage.chooseFolder() }
     }
 
     var body: some View {
@@ -475,8 +480,8 @@ struct FirstRunView: View {
                     Text(tr("Back up this Mac", "이 맥 백업하기"))
                         .font(AppText.largeTitle.weight(.bold))
                         .accessibilityAddTraits(.isHeader)
-                    Text(tr("LazyMac saves the list of your apps, your settings and your sign-ins, so a new Mac can be set up the same way.",
-                            "LazyMac은 앱 목록, 설정, 로그인 정보를 저장해 두었다가 새 맥을 똑같이 꾸며 줘요."))
+                    Text(tr("LazyMac saves the list of apps and tools on this Mac, so your next Mac can install them again, clean.",
+                            "LazyMac은 이 맥의 앱과 도구 목록을 저장해 두었다가, 다음 맥에 깨끗하게 새로 설치해 줘요."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -484,7 +489,10 @@ struct FirstRunView: View {
                     if let place, placeReady {
                         StatusLabel(kind: .ok, text: place.sentence)
                     } else if let place, place.drive {
-                        StatusLabel(kind: .problem, text: tr("Google Drive is not connected yet. Finish the steps in Settings.", "Google 드라이브가 아직 연결되지 않았어요. 설정에서 남은 단계를 마쳐 주세요."))
+                        Text(tr("Backups go to Google Drive unless you choose a folder.\nInstall rclone and connect your account in Settings.",
+                                "폴더를 고르지 않으면 Google 드라이브에 백업해요.\n설정에서 rclone을 설치하고 계정을 연결해 주세요."))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else if let place, !place.connected {
                         StatusLabel(kind: .problem, text: tr("The disk “\(place.disk ?? "")” is not connected. Connect it, or choose another folder.", "“\(place.disk ?? "")” 디스크가 연결되어 있지 않아요. 디스크를 연결하거나 다른 폴더를 골라 주세요."))
                     } else {
@@ -495,20 +503,24 @@ struct FirstRunView: View {
                     }
                     HStack(spacing: Space.l) {
                         if placeReady {
-                            Button(tr("Choose Another Folder…", "다른 폴더 고르기…")) { storage.chooseFolder() }.fixedSize()
+                            Button(drive ? tr("Open Google Drive Settings…", "Google 드라이브 설정 열기…") : tr("Choose Another Folder…", "다른 폴더 고르기…")) {
+                                choosePlace()
+                            }
+                            .fixedSize()
                         } else {
-                            Button(tr("Choose Folder…", "폴더 고르기…")) { storage.chooseFolder() }
+                            Button(drive ? tr("Set Up Google Drive…", "Google 드라이브 준비…") : tr("Choose Folder…", "폴더 고르기…")) { choosePlace() }
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.large)
                                 .keyboardShortcut(.defaultAction)
                                 .fixedSize()
                         }
-                        Button(place?.drive == true ? tr("Open Google Drive Settings…", "Google 드라이브 설정 열기…") : tr("Use Google Drive Instead…", "Google 드라이브 쓰기…")) {
-                            if place?.drive != true {
-                                storage.config.backend = .gdrive
-                                storage.save()
+                        Button(drive ? tr("Use a Folder Instead…", "대신 폴더 쓰기…") : tr("Use Google Drive Instead", "Google 드라이브 쓰기")) {
+                            if drive {
+                                storage.chooseFolder()
+                            } else {
+                                storage.setBackend(.gdrive)
+                                backup.refresh()
                             }
-                            SettingsTab.open(.place, openSettings)
                         }
                         .buttonStyle(.link)
                         .fixedSize()
@@ -544,6 +556,7 @@ struct FirstRunView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .task(id: storage.config.target) {
+            StorageConfig.saveDefaultsIfMissing()
             backup.refresh()
             hasBackup = await storage.placeHasBackup()
         }

@@ -2,18 +2,23 @@
 
 # LazyMac
 
-**Back up your Mac, and set up the next one cleanly.**
+**Install this Mac's apps and tools on your next Mac, clean.**
 
 [한국어](README-ko.md) · [Download](https://github.com/floweredao/LazyMac/releases/latest) · [Daily history](https://lazymac-history.pages.dev/)
 
 </div>
 
-LazyMac keeps a list of the apps, tools, settings, and sign-ins on your Mac and backs it up every day. On a new Mac it installs only what is on that list, so you start clean instead of copying years of leftovers.
+LazyMac has one goal: set up your next Mac with the same apps and tools as this one, installed fresh.
 
-- **One-click backup** to a folder or external disk. Google Drive is optional.
+It keeps a list of the apps, tools, settings, and sign-ins on this Mac and backs it up to Google Drive.\
+On the new Mac, it installs fresh copies of what is on that list.\
+Years of old files and leftovers stay behind.
+
+- **Clean install on a new Mac**: pick what to bring, review it, and install.
+- **One-click backup** to Google Drive by default, or to a folder or external disk.
 - **Automatic backups** every hour, day, or week, even when the app is closed.
 - **Passwords locked with your passphrase** in one encrypted file.
-- **Step-by-step restore**: pick what to bring, review it, and install.
+- **Folder backup is optional**: copying folders such as projects is off until you turn it on.
 - **Nothing is deleted**: backups never remove files, and restores never overwrite yours.
 
 <img src="docs/app.png" width="720" alt="LazyMac Back Up screen">
@@ -32,18 +37,19 @@ LazyMac keeps a list of the apps, tools, settings, and sign-ins on your Mac and 
 | Apps and tools | The list of installed apps, Homebrew packages, App Store apps, global command-line tools, fonts, and background jobs | A read-only scan of this Mac |
 | Settings | Shell, Git, tmux, npm, and SSH settings files, plus Dock and Finder settings | `bin/settings.sh`. A file that looks like it holds a secret is skipped |
 | Passwords and sign-ins | SSH keys, sign-in files, and Keychain items you choose, in one file locked with your passphrase | `bin/secrets-pack.sh` ([details](docs/secrets.md)) |
-| Files and folders (optional) | Folders you pick that are not already on iCloud or GitHub | `bin/nogit-backup.sh` |
+| Files and folders (optional) | Folders you pick that are not already on iCloud or GitHub. Off until you turn it on | `bin/nogit-backup.sh` |
 
 Every backup is checked with `gitleaks` before it is saved, so a stray password does not end up in the list.
 
 ### First backup
 
-1. Open **LazyMac**. The first screen asks where backups should go.
-2. **Choose a place.** A folder on an external disk is safest, because the backup survives if this Mac breaks. Any folder works and needs no extra tools.
-   - **To use Google Drive instead**, open **Settings > Backup Place** (`⌘,`), pick **Google Drive**, and follow the steps shown: install rclone (`brew install rclone`), then connect your account.
+1. Open **LazyMac**. A short welcome explains what it does, then asks where backups go.
+2. **Connect Google Drive (the default).** Click **Install rclone**, a free tool that copies files to Google Drive. Then click **Connect Google Drive…** and sign in to Google in your browser. rclone can see only the files LazyMac makes.
+   - **To use a folder instead**, click **Use a Folder Instead…**. A folder on an external disk needs no extra tools or sign-in.
+   - You can change the place later in **Settings > Backup Place** (`⌘,`).
 3. Click **Back Up This Mac**. It takes about a minute. Each part under **What a backup holds** gets a green check when it is saved.
 4. **Lock your passwords (recommended).** Next to **Passwords and sign-ins**, click **Set Up…** and choose a passphrase. Store it in a password manager: without it the bundle cannot be opened.
-5. **Copy folders (optional).** Turn on **Files and folders**, then pick folders in **Back Up > Folders**. Build output (`node_modules`, `DerivedData`, ...), secret-looking files (`.env`, `*.pem`, SSH keys), and folders that are already Git repositories are skipped.
+5. **Copy folders (optional, off at first).** Turn on **Files and folders**, then pick folders in **Back Up > Folders**. Build output (`node_modules`, `DerivedData`, ...), secret-looking files (`.env`, `*.pem`, SSH keys), and folders that are already Git repositories are skipped.
 
 ### Automatic backups
 
@@ -65,7 +71,9 @@ LazyMac installs a LaunchAgent (`local.lazymac-daily`) that runs the same backup
 
 1. Finish the macOS setup, sign in with your Apple ID, and **open the App Store and sign in**. App Store apps install only after this.
 2. Install LazyMac (see [Install](#install)).
-3. Connect the backup disk, or connect Google Drive in **Settings > Backup Place**, and choose **the same place** as on the old Mac. LazyMac finds the existing backup and uses its list.
+3. Choose **the same place** as on the old Mac. LazyMac finds the existing backup and uses its list.
+   - **Google Drive**: connect the same Google account. Under **Folder in Drive**, enter the folder the old Mac used. **Settings > Backup Place** on the old Mac shows it.
+   - **A folder**: connect the backup disk and choose the same folder.
 4. Open **Restore > Apps and Settings** and go through the four steps:
    1. **Prepare**: install Homebrew with one click. The backup list loads.
    2. **Choose**: pick a Mac profile (such as `pro` or `air`), turn add-ons on or off, or tick single items.

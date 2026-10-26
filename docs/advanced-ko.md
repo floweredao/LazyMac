@@ -18,7 +18,7 @@ local /Volumes/Backup/LazyMac
 files off
 ```
 
-- `backend local|gdrive`: 기본값 `local`은 폴더나 외장 디스크에 복사하고 rclone이 필요 없어요. `gdrive`는 rclone으로 Google 드라이브를 써요. `brew install rclone`으로 설치하고 `rclone config`로 연결을 만들어요(설정 → 백업 장소에 단계가 나와요). `backend` 줄 없이 `remote` 줄만 있으면 계속 `gdrive`로 봐요.
+- `backend gdrive|local`: 기본값 `gdrive`는 rclone으로 Google 드라이브를 써요. `brew install rclone`으로 설치하고 `rclone config`로 연결을 만들어요(시작 안내와 설정 → 백업 장소에 단계가 나와요). `local`은 폴더나 외장 디스크에 복사하고 rclone이 필요 없어요. `backend` 줄이 없으면 `gdrive`로 보고, `local` 줄이 있으면 `local`로 봐요.
 - `remote <원격지:경로>`: rclone 원격지 이름과 클라우드 안 폴더 경로예요(예: `gdrive:LazyMac` 또는 `gdrive:LazyMac/Alexs-MacBook-Pro`).
 - `local <경로>`: 로컬 백엔드를 쓸 때 복사본을 둘 폴더 경로예요.
 - `files on|off`: `bin/daily.sh`에서 폴더·프로젝트 백업 단계를 실행할지 정해요. 기본값은 `off`예요.
