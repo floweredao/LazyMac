@@ -95,7 +95,7 @@ final class SetupModel {
             && fm.fileExists(atPath: url.appendingPathComponent("groups.tsv").path)
     }
 
-    var ready: Bool { repo != nil && !rows.isEmpty }
+    var ready: Bool { repo != nil }
 
     func reloadCatalog() {
         if let repo { use(repo: repo, keepSelection: true) }
@@ -103,8 +103,8 @@ final class SetupModel {
 
     func use(repo url: URL, keepSelection: Bool = false) {
         guard Self.isRepo(url) else {
-            loadError = tr("\(url.path) is not a LazyMac data folder (catalog.tsv and groups.tsv are required)",
-                           "\(url.path)에 LazyMac 데이터가 없어요 (catalog.tsv와 groups.tsv가 필요해요)")
+            loadError = tr("\(url.path) does not hold a LazyMac backup list.",
+                           "\(url.path) 폴더에 LazyMac 백업 목록이 없어요.")
             return
         }
         do {

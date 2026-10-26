@@ -3,8 +3,9 @@ import Foundation
 import Observation
 
 struct StorageConfig: Equatable {
-    enum Backend: String, CaseIterable { case gdrive, local }
-    var backend: Backend = .gdrive
+    /// local: a folder the user picks (an external disk, say), no extra tools. gdrive: Google Drive through rclone.
+    enum Backend: String, CaseIterable { case local, gdrive }
+    var backend: Backend = .local
     var remote = "gdrive:LazyMac"
     var local = ""
     var files = false
@@ -15,20 +16,25 @@ struct StorageConfig: Equatable {
             ?? BackupConfig.supportDir.appendingPathComponent("storage.conf").path)
     }
 
+    static var exists: Bool { FileManager.default.fileExists(atPath: url.path) }
+
+    /// Reads storage.conf the way bin/storage.sh does, including its rule for a file with no backend line.
     static func load() -> StorageConfig {
         var c = StorageConfig()
+        var sawBackend = false, sawRemote = false
         for line in ((try? String(contentsOf: url, encoding: .utf8)) ?? "").components(separatedBy: "\n") {
             let parts = line.split(maxSplits: 1, whereSeparator: \.isWhitespace).map(String.init)
             guard parts.count == 2 else { continue }
             switch parts[0] {
-            case "backend": c.backend = Backend(rawValue: parts[1]) ?? .gdrive
-            case "remote": c.remote = parts[1]
+            case "backend": c.backend = Backend(rawValue: parts[1]) ?? .local; sawBackend = true
+            case "remote": c.remote = parts[1]; sawRemote = true
             case "local": c.local = BackupConfig.expand(parts[1])
             case "files": c.files = parts[1] == "on"
             case "data": c.data = BackupConfig.expand(parts[1])
             default: break
             }
         }
+        if !sawBackend { c.backend = sawRemote && c.local.isEmpty ? .gdrive : .local }
         return c
     }
 
@@ -36,6 +42,8 @@ struct StorageConfig: Equatable {
         URL(fileURLWithPath: BackupConfig.expand(ProcessInfo.processInfo.environment["LAZYMAC_DATA"] ?? data))
     }
     var target: String { backend == .local ? local : remote }
+    /// A backup place is chosen (a local folder or a Google Drive remote).
+    var hasPlace: Bool { !target.isEmpty }
     var isInitialized: Bool { FileManager.default.fileExists(atPath: dataURL.appendingPathComponent("catalog.tsv").path) }
 
     func save() throws {
@@ -45,6 +53,41 @@ struct StorageConfig: Equatable {
         try FileManager.default.createDirectory(at: Self.url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let text = "backend \(backend.rawValue)\nremote \(remote)\nlocal \(local)\nfiles \(files ? "on" : "off")\ndata \(data)\n"
         try text.write(to: Self.url, atomically: true, encoding: .utf8)
+    }
+
+    /// Where backups go, in words: the folder and the disk it is on, or the folder in Google Drive.
+    struct Place {
+        let folder: String
+        let disk: String?
+        let external: Bool
+        let connected: Bool
+        let drive: Bool
+
+        var sentence: String {
+            if drive { return tr("Backups go to the folder “\(folder)” in Google Drive.", "백업은 Google 드라이브의 “\(folder)” 폴더에 저장돼요.") }
+            guard let disk else { return tr("Backups go to the folder “\(folder)”.", "백업은 “\(folder)” 폴더에 저장돼요.") }
+            return external ? tr("Backups go to the folder “\(folder)” on the disk “\(disk)”.", "백업은 “\(disk)” 디스크의 “\(folder)” 폴더에 저장돼요.")
+                            : tr("Backups go to the folder “\(folder)” on \(disk).", "백업은 \(disk)의 “\(folder)” 폴더에 저장돼요.")
+        }
+    }
+
+    var place: Place? {
+        guard hasPlace else { return nil }
+        if backend == .gdrive {
+            let path = remote.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).dropFirst().first.map(String.init) ?? ""
+            return Place(folder: path.isEmpty ? remote : (path as NSString).lastPathComponent, disk: nil, external: false, connected: true, drive: true)
+        }
+        let url = URL(fileURLWithPath: local)
+        let values = try? url.resourceValues(forKeys: [.volumeLocalizedNameKey, .volumeIsInternalKey])
+        if let values, let name = values.volumeLocalizedName {
+            return Place(folder: url.lastPathComponent, disk: name, external: values.volumeIsInternal == false, connected: true, drive: false)
+        }
+        // Nothing there: a folder on a disk that is not plugged in, or a folder that is gone.
+        let parts = url.pathComponents
+        if parts.count > 2, parts[1] == "Volumes" {
+            return Place(folder: url.lastPathComponent, disk: parts[2], external: true, connected: false, drive: false)
+        }
+        return Place(folder: url.lastPathComponent, disk: nil, external: false, connected: true, drive: false)
     }
 }
 
@@ -86,6 +129,10 @@ extension Tools {
 
 @MainActor @Observable
 final class StorageModel {
+    /// example: the small fictional list, to try LazyMac. restore: the list already in the backup place.
+    /// new: an empty list for this Mac, for a real first backup.
+    enum Start: String { case example, restore, new }
+
     var config = StorageConfig.load()
     private(set) var capacity: StorageCapacity?
     private(set) var busy = false
@@ -97,27 +144,74 @@ final class StorageModel {
         capacity = StorageCapacity.load(target: config.target)
     }
 
+    func reload() {
+        config = StorageConfig.load()
+        capacity = StorageCapacity.load(target: config.target)
+    }
+
     func save() {
         do {
             try config.save()
-            message = tr("Storage settings saved.", "저장소 설정을 저장했어요.")
+            message = tr("Saved.", "저장했어요.")
             capacity = StorageCapacity.load(target: config.target)
             Task { await refreshCapacity() }
         } catch { message = error.localizedDescription }
     }
 
-    func chooseFolder(data: Bool = false) {
+    /// Asks for the backup folder (or, with `data`, the working data folder) and saves it.
+    @discardableResult
+    func chooseFolder(data: Bool = false) -> Bool {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.prompt = tr("Use This Folder", "이 폴더 쓰기")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        if data { config.data = url.path } else { config.local = url.path }
+        panel.message = data ? tr("Choose where LazyMac keeps its working copy of your list.", "LazyMac이 목록 작업본을 둘 폴더를 골라 주세요.")
+                             : tr("Choose a folder for your backups. A folder on an external disk is safest.", "백업을 둘 폴더를 골라 주세요. 외장 디스크에 있는 폴더가 가장 안전해요.")
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        config = StorageConfig.load()
+        if data {
+            config.data = url.path
+        } else {
+            config.local = url.path
+            config.backend = .local
+        }
+        save()
+        return true
+    }
+
+    func setBackend(_ backend: StorageConfig.Backend) {
+        config = StorageConfig.load()
+        config.backend = backend
         save()
     }
 
-    func initialize(restore: Bool) async {
+    func setRemote(_ remote: String) {
+        config = StorageConfig.load()
+        config.remote = remote
+        save()
+    }
+
+    func setFiles(_ on: Bool) {
+        config = StorageConfig.load()
+        config.files = on
+        save()
+    }
+
+    /// Whether the chosen place already holds a LazyMac backup (its list).
+    func placeHasBackup() async -> Bool {
+        let c = StorageConfig.load()
+        switch c.backend {
+        case .local:
+            return !c.local.isEmpty && FileManager.default.fileExists(atPath: c.local + "/catalog.tsv")
+        case .gdrive:
+            guard let rclone = Tools.find("rclone") else { return false }
+            let r = await Shell.run([rclone, "lsf", c.remote + "/catalog.tsv"])
+            return r.code == 0 && r.out.contains("catalog.tsv")
+        }
+    }
+
+    func initialize(_ start: Start) async {
         guard !busy else { return }
         initialized = false
         guard let script = Tools.script("storage.sh") else {
@@ -127,14 +221,23 @@ final class StorageModel {
         busy = true
         defer { busy = false }
         do { try config.save() } catch { message = error.localizedDescription; return }
-        let r = await Shell.run(["/bin/zsh", script, restore ? "download" : "init"])
+        let command: [String] = switch start {
+        case .restore: ["/bin/zsh", script, "download"]
+        case .example: ["/bin/zsh", script, "init"]
+        case .new: ["/bin/zsh", script, "init", "empty"]
+        }
+        let r = await Shell.run(command)
         guard r.code == 0 else { message = SetupModel.lastLine(r); return }
         guard config.isInitialized else {
-            message = tr("No catalog was found in this storage destination.", "이 저장소에서 목록을 찾지 못했어요.")
+            message = tr("No LazyMac list was found in this backup place.", "이 백업 장소에서 LazyMac 목록을 찾지 못했어요.")
             return
         }
-        message = restore ? tr("Restored the data folder.", "데이터 폴더를 복원했어요.") : tr("Started with example data. This Mac is the main Mac.", "예제 데이터로 시작했어요. 이 맥이 주 맥이에요.")
-        if !restore {
+        message = switch start {
+        case .restore: tr("Using the list from your backup place.", "백업 장소의 목록을 쓰고 있어요.")
+        case .example: tr("Started with example data. This Mac is the main Mac.", "예제 데이터로 시작했어요. 이 맥이 주 맥이에요.")
+        case .new: tr("Started a new list for this Mac.", "이 맥의 새 목록을 만들었어요.")
+        }
+        if start != .restore {
             do {
                 let rows = try Catalog.parse(String(contentsOf: config.dataURL.appendingPathComponent("catalog.tsv"), encoding: .utf8))
                 let files = Catalog.setupFiles(chosen: rows.filter { $0.decision == .keep }, all: rows,
