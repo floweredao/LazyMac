@@ -120,7 +120,7 @@ function howText(r: Row, l: Lang): string {
     case "release": return auto(ko ? `GitHub 릴리즈 [${r.ref.split("#")[0]}](https://github.com/${r.ref.split("#")[0]}/releases)` : `GitHub release [${r.ref.split("#")[0]}](https://github.com/${r.ref.split("#")[0]}/releases)`);
     case "download": return ko ? `직접 ${link("받기")}` : `by hand: ${link("download")}`;
     case "build": return ko ? `직접 ${link("빌드")}` : `by hand: ${link("build")}`;
-    case "repo": return auto(r.ref);
+    case "repo": return auto(r.ref.split("#")[0]);
     case "bundle": return auto(ko ? "암호화 묶음" : "encrypted bundle");
     case "copy": return auto(ko ? "복사" : "copied");
     case "with-tool": case "with-app": return ko ? `${r.ref} 설치 때 같이 옴` : `comes with ${r.ref}`;
@@ -247,8 +247,23 @@ export function setupFiles(rows: Row[], pick: (r: Row) => boolean = (r) => r.dec
       const [repo, pattern] = r.ref.split("#");
       return `${r.name}\t${repo}\t${pattern || "-"}\t${installedPath(r)}`;
     }),
+    "setup/repos.tsv": head + repoLines(of("repo").map((r) => r.ref)).join("\n") + "\n",
     "setup/versions.env": `${head}NODE_VERSION=${node}\nPYTHON_VERSION=${py}\n`,
   };
+}
+
+// how=repo ref: `owner/repo[#folder[#install command]]` -> `owner/repo<TAB>folder<TAB>command` for `setup.sh repos`.
+// The folder defaults to ~/Documents/<repo>, the command to none (-). A repo named twice is cloned once.
+export function repoLines(refs: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const ref of refs) {
+    const [repo, folder, command] = ref.split("#").map((s) => s.trim());
+    if (!repo || seen.has(repo)) continue;
+    seen.add(repo);
+    out.push(`${repo}\t${folder || `~/Documents/${repo.split("/").pop()}`}\t${command || "-"}`);
+  }
+  return out;
 }
 
 function installedPath(r: Row): string {

@@ -43,7 +43,7 @@ The Homebrew installer also installs the Xcode Command Line Tools. For `gh auth 
 
 ## 3. What each setup step does
 
-`bin/setup.sh --list` shows the steps; `bin/setup.sh <step>` runs a single step again. Every step skips what is already done.
+`bin/setup.sh --list` shows the steps; `bin/setup.sh --dry-run` shows what every step would install or change without doing it; `bin/setup.sh <step>` runs a single step again. Every step skips what is already done.
 
 | Step | What it does | Needs | If it stops |
 |---|---|---|---|
@@ -52,10 +52,10 @@ The Homebrew installer also installs the Xcode Command Line Tools. For `gh auth 
 | `bun` | Installs bun, then global packages in `setup/bun.txt` | | |
 | `python` | `uv python install` for the version in `setup/versions.env` | `brew` | |
 | `scripts` | Runs the official install script of each tool in `setup/scripts.tsv` | | |
-| `releases` | Downloads and installs the latest GitHub release (`.dmg` or `.zip`) for each app in `setup/releases.tsv` | `gh` login | Check the repo or asset pattern in *Manage App Sources…* and run `bin/setup.sh releases` again |
+| `releases` | Downloads and installs the latest GitHub release (`.dmg` or `.zip`) for each app in `setup/releases.tsv` | `gh` login only for private repos (public ones work before you sign in) | Check the repo or asset pattern in *Manage App Sources…* and run `bin/setup.sh releases` again |
 | `dotfiles` | Copies `dotfiles/` to `~` (`ssh/config` to `~/.ssh/config`) and applies `dotfiles/macos-defaults.tsv`. Existing files that differ are backed up to `~/.local/share/lazymac/restore-backup-<time>/` first | | |
 | `secrets` | `bin/secrets-restore.sh`: sign-in files, Keychain API keys, private job files, and scripts | `brew` (`age`), the passphrase | A wrong passphrase changes nothing; run `bin/setup.sh secrets` again |
-| `repos` | Clones and runs the installer scripts of helper repositories configured in `setup.sh` | `gh` login | |
+| `repos` | Clones each repo in `setup/repos.tsv` (catalog rows with `how` `repo`) into its folder and runs its command | `gh` login only for private repos | Run `gh auth login`, then `bin/setup.sh repos` again |
 | `jobs` | For each label in `setup/jobs.txt`: if its plist and program exist, loads it with `launchctl bootstrap`; otherwise prints what it is waiting for | `secrets`, and the target program | Install what the job waits for, then run `bin/setup.sh jobs` again |
 | `downloads` | Opens the download page of every app and font in `setup/downloads.tsv` that is not installed yet | | |
 | `check` | Scans the Mac again and lists `keep` items still missing | `bun` | |

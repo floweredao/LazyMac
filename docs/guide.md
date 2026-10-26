@@ -92,5 +92,5 @@ tests/app-setup-files.sh            # the app's lists match setup/ and catalog.t
 tests/app-schedule.sh               # the auto backup schedule lands in the LaunchAgent (in a temporary folder)
 # bump app/VERSION (new screens or behavior 1.x.0, fixes 1.0.x)
 app/build.sh                        # app/build/LazyMac-<version>.zip
-gh release create app-v$(cat app/VERSION) app/build/LazyMac-$(cat app/VERSION).zip -R floweredao/LazyMac --title "LazyMac App $(cat app/VERSION)"
+gh release create v$(cat app/VERSION) app/build/LazyMac-$(cat app/VERSION).zip -R floweredao/LazyMac --title "LazyMac $(cat app/VERSION)"
 ```

@@ -43,7 +43,7 @@ Homebrew 설치기가 Xcode Command Line Tools도 같이 깔아요. `gh auth log
 
 ## 3. setup 단계별로 하는 일
 
-`bin/setup.sh --list`로 전체 단계를 보고, `bin/setup.sh <단계>`로 원하는 단계만 다시 돌려요. 이미 설치된 항목은 건너뛰어요.
+`bin/setup.sh --list`로 전체 단계를 보고, `bin/setup.sh --dry-run`으로 각 단계가 무엇을 설치하고 바꿀지 실제로 하지 않고 미리 봐요. `bin/setup.sh <단계>`로 원하는 단계만 다시 돌려요. 이미 설치된 항목은 건너뛰어요.
 
 | 단계 | 하는 일 | 필요한 것 | 멈추면 |
 |---|---|---|---|
@@ -52,10 +52,10 @@ Homebrew 설치기가 Xcode Command Line Tools도 같이 깔아요. `gh auth log
 | `bun` | bun 설치 후 `setup/bun.txt` 전역 도구 설치 | | |
 | `python` | `setup/versions.env`의 파이썬 버전을 uv로 설치 | `brew` | |
 | `scripts` | `setup/scripts.tsv`의 공식 설치 스크립트 실행 | | |
-| `releases` | `setup/releases.tsv`에 적힌 저장소의 최신 GitHub 릴리즈에서 `.dmg`·`.zip`을 받아 앱 설치 | `gh` 로그인 | *앱 출처 관리…*에서 저장소나 파일 패턴을 확인하고 `bin/setup.sh releases` 다시 실행 |
+| `releases` | `setup/releases.tsv`에 적힌 저장소의 최신 GitHub 릴리즈에서 `.dmg`·`.zip`을 받아 앱 설치 | 비공개 저장소만 `gh` 로그인 (공개 저장소는 로그인 전에도 돼요) | *앱 출처 관리…*에서 저장소나 파일 패턴을 확인하고 `bin/setup.sh releases` 다시 실행 |
 | `dotfiles` | `dotfiles/`를 `~`로 복사(`ssh/config`는 `~/.ssh/config`)하고 `dotfiles/macos-defaults.tsv` 설정 적용. 내용이 다른 기존 파일은 먼저 `~/.local/share/lazymac/restore-backup-<시각>/`로 백업 | | |
 | `secrets` | `bin/secrets-restore.sh`: 로그인 파일, 키체인 API 키, 개인 작업 파일·스크립트 복원 | `brew`(`age`), 묶음 암호 | 암호가 틀리면 아무것도 안 바뀌니 다시 실행 |
-| `repos` | `setup.sh`에 설정된 보조 저장소를 받아 설치 스크립트 실행 | `gh` 로그인 | |
+| `repos` | `setup/repos.tsv`(카탈로그에서 `how`가 `repo`인 행)의 저장소를 정한 폴더에 받고 그 명령을 실행 | 비공개 저장소만 `gh` 로그인 | `gh auth login` 뒤 `bin/setup.sh repos` 다시 실행 |
 | `jobs` | `setup/jobs.txt`의 작업마다: 이미 켜져 있거나, plist와 실행 프로그램이 있으면 `launchctl bootstrap`, 아니면 무엇을 기다리는지 출력 | `secrets`, 해당 프로그램 | 기다리는 프로그램을 먼저 설치한 뒤 `bin/setup.sh jobs` 다시 실행 |
 | `downloads` | `setup/downloads.tsv`에서 아직 설치되지 않은 앱·글꼴의 내려받기 페이지 열기 | | |
 | `check` | 맥을 다시 훑어 아직 빠진 ✅ 항목 보여 주기 | `bun` | |

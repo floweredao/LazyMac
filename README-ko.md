@@ -102,7 +102,7 @@ LazyMac은 LaunchAgent(`local.lazymac-daily`)를 설치해서 앱을 닫아 둬�
 - **다시 로그인**: 브라우저, 메신저, 메일 앱, 비밀번호 관리자, VPN처럼 로그인 정보를 맥 하드웨어에 묶는 앱이에요.
 - 되살린 키체인 항목을 앱이 써도 되는지 macOS가 물으면 **항상 허용**을 골라요.
 
-아직 빠진 것을 보려면 터미널에서 `bin/setup.sh check`를 돌려요. 목록에 있는데 이 맥에 없는 항목을 모두 보여 줘요.
+아직 빠진 것을 보려면 터미널에서 `/Applications/LazyMac.app/Contents/Resources/bin/setup.sh check`를 돌려요(이 저장소를 받아 두었다면 `bin/setup.sh check`). 목록에 있는데 이 맥에 없는 항목을 모두 보여 줘요.
 
 ### 터미널로 복원
 
