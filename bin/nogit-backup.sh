@@ -53,7 +53,9 @@ if [[ -f $CONF ]]; then
     esac
   done < "$CONF"
 fi
-if [[ -f $STORAGE ]]; then CONF_REMOTE=$STORAGE_TARGET; fi
+if [[ -f $STORAGE ]]; then CONF_REMOTE=$STORAGE_TARGET
+else BACKEND=gdrive  # without storage.conf, the remote line of backup.conf is an rclone remote
+fi
 [[ -n ${NOGIT_BACKUP_ONLY:-} ]] && TARGETS=(${(M)TARGETS:#*${NOGIT_BACKUP_ONLY}*})
 EXCLUDES=(
   node_modules .build build dist DerivedData target .next .turbo .cache __pycache__
@@ -72,13 +74,13 @@ need_targets() {
 
 need_remote() {
   [[ -n $REMOTE ]] && return 0
-  print -u2 "No cloud place to copy to: choose one in LazyMac (Back Up > Folders), or add 'remote <name:path>' to $CONF."
+  print -u2 "No cloud place to copy to: choose where backups go in LazyMac Settings, or add 'remote <name:path>' to $CONF."
   exit 2
 }
 
 need_rclone() {
   command -v rclone >/dev/null && return 0
-  print -u2 "rclone is not installed: install it in LazyMac (Back Up > Folders) or with 'brew install rclone'."
+  print -u2 "rclone is not installed: install it with 'brew install rclone' (LazyMac Settings > Backup Place shows how)."
   exit 2
 }
 

@@ -2,7 +2,10 @@
 # Shared storage configuration and non-deleting data synchronization. Safe to source.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/Library/Application Support/lazymac/bin:$PATH"
 STORAGE=${LAZYMAC_STORAGE_CONF:-$HOME/Library/Application Support/lazymac/storage.conf}
-BACKEND=gdrive STORAGE_REMOTE=gdrive:LazyMac LOCAL= FILES=off DATA=$HOME/LazyMac-data
+# Backups go to a local folder (for example on an external disk) unless storage.conf says "backend gdrive"
+# (Google Drive through rclone). A storage.conf without a backend line that names a remote and no local
+# folder is from before local was the default, so it keeps meaning Google Drive.
+BACKEND= STORAGE_REMOTE=gdrive:LazyMac LOCAL= FILES=off DATA=$HOME/LazyMac-data STORAGE_REMOTE_SET=0
 if [[ -f $STORAGE ]]; then
   while IFS= read -r line || [[ -n $line ]]; do
     read -r key val <<< "$line"
@@ -10,13 +13,19 @@ if [[ -f $STORAGE ]]; then
     [[ $val == "~" || $val == "~/"* ]] && val=$HOME${val#\~}
     case $key in
       backend) BACKEND=$val ;;
-      remote) STORAGE_REMOTE=$val ;;
+      remote) STORAGE_REMOTE=$val STORAGE_REMOTE_SET=1 ;;
       local) LOCAL=$val ;;
       files) FILES=$val ;;
       data) DATA=$val ;;
     esac
   done < "$STORAGE"
 fi
+if [[ -z $BACKEND ]]; then
+  BACKEND=local
+  (( STORAGE_REMOTE_SET )) && [[ -z $LOCAL ]] && BACKEND=gdrive
+fi
+# The settings files bin/settings.sh saves into dotfiles/ and `setup.sh dotfiles` puts back (ssh/ is ~/.ssh/).
+DOTFILES=(.zshrc .zshenv .zprofile .gitconfig .tmux.conf .npmrc ssh/config)
 DATA=${LAZYMAC_DATA:-$DATA}
 export LAZYMAC_DATA=$DATA
 STORAGE_TARGET=$STORAGE_REMOTE
@@ -32,6 +41,13 @@ storage_valid() {
   [[ -n $STORAGE_TARGET ]] || { print -u2 "Choose a storage destination in LazyMac Settings."; return 2; }
   if [[ $BACKEND == local ]]; then
     [[ $LOCAL == /* ]] || { print -u2 "The local destination must be an absolute folder path."; return 2; }
+    # A folder on an external disk that is not plugged in: say so instead of failing to create it.
+    if [[ $LOCAL == /Volumes/?* ]]; then
+      local vol=/Volumes/${${LOCAL#/Volumes/}%%/*}
+      [[ -L $vol ]] || [[ -d $vol && $(stat -f %d "$vol") != $(stat -f %d /Volumes) ]] || {
+        print -u2 "The backup disk ${vol:t} is not connected. Connect it and try again."; return 2
+      }
+    fi
     # A destination inside the source would recursively copy itself.
     local src=${DATA:A} dst=${LOCAL:A}
     [[ $dst != $src && $dst != $src/* && $src != $dst/* ]] || {
@@ -116,13 +132,23 @@ if [[ ${ZSH_EVAL_CONTEXT} == toplevel ]]; then
     path) print -r -- "$DATA" ;;
     target) storage_valid && print -r -- "$STORAGE_TARGET" ;;
     init)
+      # init [example]: the small fictional example list, to try LazyMac. init empty: a new, empty list for
+      # this Mac (a real first backup; the example items are not on a real Mac, so they would all be pruned).
+      [[ ${2:-example} == (example|empty) ]] || { print -u2 "usage: storage.sh init [example|empty]"; exit 2; }
       [[ ! -e $DATA/catalog.tsv ]] || { print -u2 "Data is already initialized."; exit 2; }
       if [[ -d $DATA && -n $(find "$DATA" -mindepth 1 -maxdepth 1 -print -quit) ]]; then
-        print -u2 "Start from example requires an empty data folder."; exit 2
+        print -u2 "Starting a new list requires an empty data folder."; exit 2
       fi
-      mkdir -p "$DATA" && cp -R "${0:A:h:h}/example/." "$DATA/" || exit 1
-      printf 'host\trole\tprofiles\n%s\tmain\tpro\n' "$STORAGE_HOST" > "$DATA/machines.tsv"
+      mkdir -p "$DATA" || exit 1
+      if [[ ${2:-example} == empty ]]; then
+        head -n 1 "${0:A:h:h}/example/catalog.tsv" > "$DATA/catalog.tsv" || exit 1
+        head -n 1 "${0:A:h:h}/example/groups.tsv" > "$DATA/groups.tsv" || exit 1
+        printf 'host\trole\tprofiles\n%s\tmain\t\n' "$STORAGE_HOST" > "$DATA/machines.tsv"
+      else
+        cp -R "${0:A:h:h}/example/." "$DATA/" || exit 1
+        printf 'host\trole\tprofiles\n%s\tmain\tpro\n' "$STORAGE_HOST" > "$DATA/machines.tsv"
+      fi
       ;;
-    *) print -u2 "usage: storage.sh upload|download|init|path|target|capacity"; exit 2 ;;
+    *) print -u2 "usage: storage.sh upload|download|init [example|empty]|path|target|capacity"; exit 2 ;;
   esac
 fi

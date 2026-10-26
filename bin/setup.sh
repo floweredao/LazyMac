@@ -158,7 +158,7 @@ step_releases() {
 
 step_dotfiles() {
   local f src dest
-  for f in .zshrc .zshenv .zprofile .gitconfig .tmux.conf .npmrc ssh/config; do
+  for f in $DOTFILES; do
     src=$DATA/dotfiles/$f
     dest=$HOME/${f/#ssh\//.ssh/}
     [[ -f $src ]] || continue
