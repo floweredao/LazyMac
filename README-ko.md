@@ -8,7 +8,7 @@
 
 </div>
 
-LazyMac은 지금 맥에 설치된 것들을 기록해 두었다가, 다음 맥을 세팅할 때 묵은 찌꺼기 없이 쓰는 것만 새로 깔아 주는 맥용 앱이자 도구 모음이에요. 디스크 전체를 통째로 옮기는 대신 앱, 명령줄 도구, 백그라운드 작업, 설정, 글꼴, 비밀값을 한 목록으로 모으고 실제로 쓰는 항목만 골라 설치해요. GitHub나 iCloud에 없는 폴더를 백업하고 싶을 때는 Google 드라이브나 로컬 폴더로 안전하게 복사해 두고, 어느 쪽에서도 파일을 지우지 않아요.
+LazyMac은 지금 맥에 설치된 것들을 기록해 두었다가, 다음 맥을 세팅할 때 묵은 찌꺼기 없이 쓰는 것만 새로 깔아 주는 맥용 앱이자 도구 모음이에요. 디스크 전체를 통째로 옮기는 대신 앱, 명령줄 도구, 백그라운드 작업, 설정, 글꼴, 비밀값을 한 목록으로 모으고 실제로 쓰는 항목만 골라 설치해요. 백업은 직접 고른 폴더(외장 디스크가 가장 안전해요)에 저장되고 추가 도구가 필요 없어요. Google 드라이브는 설정에서 고를 수 있어요. GitHub나 iCloud에 없는 폴더 복사는 선택 기능이고, 어느 쪽에서도 파일을 지우지 않아요.
 
 ## 주요 기능
 
@@ -17,7 +17,8 @@ LazyMac은 지금 맥에 설치된 것들을 기록해 두었다가, 다음 맥�
 - **프로필과 여러 맥 지원.** 맥 기본 프로필(`pro`, `air`)과 쓰임 프로필(`dev`, `light`, `outside`)을 조합해 맥마다 다르게 설치하고, 지금 맥과 비교해요. 맥별 스캔 결과는 `inventory/<맥 이름>/`에 따로 저장되어 모든 맥에서 지워진 항목만 목록에서 빠져요.
 - **앱 출처 관리.** Homebrew나 App Store에 없는 앱을 어디서 받는지(GitHub 릴리즈, 다운로드 페이지, 직접 빌드) 앱 안에서 바로 확인하고 최신 릴리즈로 맞춰요.
 - **암호화된 비밀값 묶음.** 로그인 설정 파일, SSH 키, 키체인 항목, 백그라운드 작업 파일을 암호 하나로 잠근 [age](https://age-encryption.org) 파일(`secrets/secrets.tar.age`)에 담아 옮기고, 푸시하기 전에 `gitleaks`로 비밀값 노출을 막아요.
-- **필요할 때 켜는 폴더 백업과 복원.** 고른 폴더를 Google 드라이브(또는 rclone이 지원하는 클라우드)나 로컬 폴더에 복사해요. 빌드 캐시와 비밀값 파일은 자동으로 건너뛰고, 복원할 때 맥에 이미 있는 파일은 덮어쓰지 않아요.
+- **버튼 하나로 이 맥 백업.** 앱과 도구 목록, 설정 파일과 macOS 설정을 저장해 백업 장소로 복사해요. 로컬 폴더는 rclone 없이 돌아가고, Google 드라이브는 선택이에요.
+- **필요할 때 켜는 폴더 백업과 복원.** 고른 폴더를 로컬 폴더나, 고른 경우 Google 드라이브(또는 rclone이 지원하는 클라우드)에 복사해요. 빌드 캐시와 비밀값 파일은 자동으로 건너뛰고, 복원할 때 맥에 이미 있는 파일은 덮어쓰지 않아요.
 
 ## 설치하기
 
@@ -121,13 +122,12 @@ LazyMac은 카탈로그 관리와 폴더·프로젝트 파일 백업을 분리�
 백업 저장소 동작은 `~/Library/Application Support/lazymac/storage.conf`에서 설정해요(`LAZYMAC_STORAGE_CONF` 환경 변수로 경로 변경 가능).
 
 ```text
-backend gdrive
-remote gdrive:LazyMac
-local ~/Backups/LazyMac
+backend local
+local /Volumes/Backup/LazyMac
 files off
 ```
 
-- `backend gdrive|local`: Google 드라이브(또는 다른 rclone 원격지)를 쓸 때는 `gdrive`, 로컬 폴더나 외장 드라이브를 쓸 때는 `local`로 적어요.
+- `backend local|gdrive`: 기본값 `local`은 폴더나 외장 디스크에 복사하고 rclone이 필요 없어요. `gdrive`는 rclone으로 Google 드라이브를 써요. `brew install rclone`으로 설치하고 `rclone config`로 연결을 만들어요(설정 → 백업 장소에 단계가 나와요). `backend` 줄 없이 `remote` 줄만 있으면 계속 `gdrive`로 봐요.
 - `remote <원격지:경로>`: rclone 원격지 이름과 클라우드 안 폴더 경로예요(예: `gdrive:LazyMac` 또는 `gdrive:LazyMac/Alexs-MacBook-Pro`).
 - `local <경로>`: 로컬 백엔드를 쓸 때 복사본을 둘 폴더 경로예요.
 - `files on|off`: `bin/daily.sh`에서 폴더·프로젝트 백업 단계를 실행할지 정해요. 기본값은 `off`예요.
@@ -166,8 +166,6 @@ security add-generic-password -U -a account-id -s lazymac-cloudflare -w "<YOUR_C
 키체인에 두 항목이 없으면 `wrangler login`으로 로그인된 세션을 대신 사용해요. 공개 히스토리 페이지에 절대 올라가면 안 되는 개인 단어가 있다면 `~/.config/lazymac/private-words`(`LAZYMAC_PRIVATE_WORDS`)에 한 줄에 하나씩 적어 두면 빌드할 때 자동으로 검사해 차단해요.
 
 ## 스크린샷
-
-> 안내: 아래 스크린샷은 추후 업데이트에서 새 캡처 화면으로 교체될 예정이에요.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/app-ko-dark.png"><img src="docs/app-ko.png" width="760" alt="LazyMac 백업 한눈에 화면"></picture>
 

@@ -8,7 +8,7 @@
 
 </div>
 
-LazyMac keeps track of what is installed on your Mac and sets up your next Mac from scratch without copying years of leftovers. Instead of migrating a whole disk, it scans your apps, command-line tools, background jobs, settings, fonts, and secrets into a single catalog, then installs only what you still use. When you also want to back up folders that are not on GitHub or iCloud, LazyMac copies them to Google Drive or a local folder without ever deleting anything.
+LazyMac keeps track of what is installed on your Mac and sets up your next Mac from scratch without copying years of leftovers. Instead of migrating a whole disk, it scans your apps, command-line tools, background jobs, settings, fonts, and secrets into a single catalog, then installs only what you still use. Backups go to a folder you pick (an external disk is safest) and need no extra tools; Google Drive is an option in Settings. Copying project folders that are not on GitHub or iCloud is an optional extra, and nothing is ever deleted.
 
 ## Main features
 
@@ -17,7 +17,8 @@ LazyMac keeps track of what is installed on your Mac and sets up your next Mac f
 - **Profiles and multi-Mac support.** Define base profiles (like `pro` or `air`) and add-on profiles (like `dev`, `light`, or `outside`), compare any profile with this Mac, and keep per-Mac scans in `inventory/<Mac name>/` so pruning only drops items removed from every Mac.
 - **App sources manager.** Check and update where non-Homebrew apps come from (GitHub releases, download pages, or source builds) right in the app.
 - **Encrypted secrets bundle.** Packs sign-in files, SSH keys, Keychain items, and private job files into one passphrase-locked [age](https://age-encryption.org) archive (`secrets/secrets.tar.age`), and checks commits with `gitleaks` before pushing.
-- **Optional folder backup and restore.** Copies chosen folders to Google Drive (or any rclone remote) or a local folder, skips build artifacts and secrets, and restores missing files without overwriting what is already on your Mac.
+- **Back Up This Mac in one click.** Lists your apps and tools, saves your settings files and macOS settings, and copies them to your backup place. A local folder works without rclone; Google Drive is optional.
+- **Optional folder backup and restore.** Copies chosen folders to a local folder or, if you choose it, Google Drive (or any rclone remote), skips build artifacts and secrets, and restores missing files without overwriting what is already on your Mac.
 
 ## Install
 
@@ -121,13 +122,12 @@ LazyMac separates catalog setup from folder backup. Folder and project backup is
 Storage behavior is configured in `~/Library/Application Support/lazymac/storage.conf` (override the path with `LAZYMAC_STORAGE_CONF`):
 
 ```text
-backend gdrive
-remote gdrive:LazyMac
-local ~/Backups/LazyMac
+backend local
+local /Volumes/Backup/LazyMac
 files off
 ```
 
-- `backend gdrive|local`: choose Google Drive (or another rclone remote) with `gdrive`, or a local directory/mounted drive with `local`.
+- `backend local|gdrive`: `local` (the default) copies to a folder or external disk and never needs rclone. `gdrive` uses Google Drive through rclone: install it with `brew install rclone` and create a remote with `rclone config` (Settings > Backup Place shows these steps). A file with a `remote` line and no `backend` line still means `gdrive`.
 - `remote <remote:path>`: the rclone remote and folder path (for example `gdrive:LazyMac` or `gdrive:LazyMac/Alexs-MacBook-Pro`).
 - `local <path>`: the local destination folder when using a local backend.
 - `files on|off`: turns scheduled folder and project backup on or off in `bin/daily.sh`. The default is `off`.
@@ -166,8 +166,6 @@ security add-generic-password -U -a account-id -s lazymac-cloudflare -w "<YOUR_C
 If those Keychain entries are not set, `snapshot.ts deploy` falls back to your active `wrangler login` session. To block personal terms from ever appearing on the public history page, list them one per line in `~/.config/lazymac/private-words` (or set `LAZYMAC_PRIVATE_WORDS`).
 
 ## Screenshots
-
-> Note: Existing screenshots below will be replaced with fresh captures in a later update.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/app-dark.png"><img src="docs/app.png" width="760" alt="LazyMac Back Up overview"></picture>
 
