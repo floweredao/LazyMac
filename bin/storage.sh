@@ -101,7 +101,8 @@ storage_data() {
       elif [[ -d $DATA/$entry ]]; then
         rclone copy "$DATA/$entry" "$STORAGE_TARGET/$entry" || rc=1
       else
-        rclone copy "$DATA/$entry" "$STORAGE_TARGET/${entry:h}" || rc=1
+        # copyto keeps a top-level file at the root; copy to "<target>/." makes a folder named "." on Drive.
+        rclone copyto "$DATA/$entry" "$STORAGE_TARGET/$entry" || rc=1
       fi
     done
     storage_capacity
