@@ -26,7 +26,12 @@ enum Main {
             exit(schedule(args, at: i))
         }
         if args.contains("--run-backup") {
-            exit(ScheduledBackup.run())
+            exit(ScheduledBackup.run(ifDue: args.contains("--if-due")))
+        }
+        // bin/due.sh asks this before an automatic backup: free, metered (hotspot, Low Data Mode) or offline.
+        if args.contains("--network-status") {
+            print(NetworkStatus.current().rawValue)
+            return
         }
         LazymacApp.main()
     }
@@ -64,8 +69,9 @@ enum Main {
         }
     }
 
-    // Test hook: `lazymac --schedule <spec>|off|show [--repo <path>]` changes the auto backup LaunchAgent the
-    // same way the settings window does. spec: hourly[:MM] | every:<N>[:HH:MM] | daily:HH:MM | weekly:<0-6>:HH:MM
+    // Test hook: `lazymac --schedule <spec>|off|show|upgrade [--repo <path>]` changes the auto backup LaunchAgent the
+    // same way the settings window does (upgrade: what the app does at launch). spec: hourly[:MM] | every:<N>[:HH:MM] |
+    // daily:HH:MM | weekly:<0-6>:HH:MM
     static func schedule(_ args: [String], at i: Int) -> Int32 {
         guard i + 1 < args.count else { return fail("usage: lazymac --schedule <spec>|off|show [--repo <path>]", 2) }
         let repo = value(args, "--repo").map { URL(fileURLWithPath: $0) } ?? SetupModel.findRepo()
@@ -73,6 +79,7 @@ enum Main {
         do {
             switch spec {
             case "show": break
+            case "upgrade": AutoBackup.upgradeIfNeeded()
             case "off": try AutoBackup.remove()
             default:
                 guard let s = BackupSchedule(spec: spec) else { return fail("bad schedule: \(spec)", 2) }
@@ -105,6 +112,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // quits, so README screenshots can be made without the window being on screen.
     func applicationDidFinishLaunching(_ notification: Notification) {
         let env = ProcessInfo.processInfo.environment
+        // Automatic runs ask this app about the network, and an older job gets the catch-up keys.
+        if let exe = Bundle.main.executablePath, BackupState.value("app") != exe { BackupState.set("app", exe) }
+        AutoBackup.upgradeIfNeeded()
         if let size = env["LAZYMAC_WINDOW"]?.split(separator: "x").compactMap({ Double($0) }), size.count == 2 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 for w in NSApp.windows where w.title == "LazyMac" || w.identifier?.rawValue.hasPrefix("main") == true {

@@ -138,6 +138,15 @@ enum Tools {
         }
         return nil
     }
+
+    /// bin/due.sh, the catch-up rules: the repo's copy, then the one inside the app.
+    static var dueScript: String? {
+        if let script = Tools.script("due.sh") { return script }
+        if let bundled = Bundle.main.url(forResource: "due", withExtension: "sh"), FileManager.default.fileExists(atPath: bundled.path) {
+            return bundled.path
+        }
+        return nil
+    }
 }
 
 @MainActor @Observable
@@ -413,7 +422,11 @@ final class BackupModel {
     var scheduledRunning: Bool { AutoBackup.isRunning }
 
     func backUpNow() {
-        guard !scheduledRunning else {
+        guard !BackupState.paused else {
+            message = tr("Backups are paused. Resume them on This Mac first.", "백업이 멈춰 있어요. 먼저 '이 맥'에서 다시 켜 주세요.")
+            return
+        }
+        guard !scheduledRunning, BackupLock.holder() == nil else {
             message = tr("The scheduled backup is running now. Try again when it is done.", "예약된 백업이 지금 도는 중이에요. 끝나면 다시 눌러 주세요.")
             return
         }
@@ -478,20 +491,38 @@ final class BackupModel {
 
 // MARK: - Scheduled run without a repo
 
-/// `lazymac --run-backup`: what the LaunchAgent runs on a Mac with no LazyMac repo (or no bun). Copies the folders,
-/// compares, logs to ~/Library/Logs/lazymac-daily/<date>.log and shows a notification when something failed.
+/// `lazymac --run-backup [--if-due]`: what the LaunchAgent runs on a Mac with no LazyMac repo (or no bun). Copies the
+/// folders, compares, logs to ~/Library/Logs/lazymac-daily/<date>.log and shows a notification when something failed.
+/// It follows the same catch-up rules, pause and lock as daily.sh, through bin/due.sh.
 enum ScheduledBackup {
-    static func run() -> Int32 {
+    static func run(ifDue: Bool) -> Int32 {
         let env = ProcessInfo.processInfo.environment
         // With initialized data, the same daily pipeline handles both app and LaunchAgent runs.
         if StorageConfig.load().isInitialized, let script = Tools.script("daily.sh") {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/zsh")
-            p.arguments = [script]
+            p.arguments = [script] + (ifDue ? ["--if-due"] : [])
             do { try p.run(); p.waitUntilExit(); return p.terminationStatus }
             catch { return notify(error.localizedDescription) }
         }
-        let logDir = URL(fileURLWithPath: env["LAZYMAC_DAILY_LOGDIR"] ?? NSHomeDirectory() + "/Library/Logs/lazymac-daily")
+        let due = Tools.dueScript
+        func rules(_ args: [String], net: String? = nil) -> [String] {
+            guard let due else { return ["run"] }
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            p.arguments = [due] + args
+            if let net { p.environment = env.merging(["LAZYMAC_NET": net]) { _, new in new } }
+            let out = Pipe()
+            p.standardOutput = out
+            p.standardError = FileHandle.nullDevice
+            guard (try? p.run()) != nil else { return ["run"] }
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            return String(decoding: data, as: UTF8.self).components(separatedBy: "\n").filter { !$0.isEmpty }
+        }
+        if ifDue, rules(["decide"]).first != "run" { return 0 }
+
+        let logDir = DailyLog.dir
         try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
@@ -508,12 +539,34 @@ enum ScheduledBackup {
             write("=== ok (file backup off)")
             return 0
         }
+        if BackupState.paused {
+            if !ifDue { write("skip: paused") }
+            return 0
+        }
+        guard let lock = BackupLock.acquire() else {
+            let pid = BackupLock.holder().map { " (pid \($0))" } ?? ""
+            if ifDue { write("skip: running\(pid)"); return 0 }
+            write("FAIL: another backup is still running\(pid)")
+            return notify(tr("Another backup is still running.", "다른 백업이 아직 돌고 있어요."))
+        }
+        defer { close(lock) }
+        if ifDue {
+            let net = env["LAZYMAC_NET"].flatMap(NetworkStatus.init(rawValue:)) ?? NetworkStatus.current()
+            let answer = rules(["net"], net: net.rawValue)
+            if let first = answer.first, first != "run" {
+                if first == "skip offline" || first == "skip metered" { write(first.replacingOccurrences(of: "skip ", with: "skip: ")) }
+                if answer.count > 1 { _ = notify(answer[1], prefixed: false) }
+                return 0
+            }
+            _ = rules(["start"])
+        }
         guard let script = Tools.backupScript(repo: SetupModel.findRepo()) else {
             write("FAIL: no folder backup script")
             return notify(tr("The folder backup script is missing.", "폴더 백업 스크립트가 없어요."))
         }
         write("=== start (folder backup)")
         for (args, what) in [(["rclone"], "backup"), (["rclone", "--check"], "check")] {
+            if BackupState.paused { write("=== paused"); return 0 }
             write(what)
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/zsh")
@@ -526,16 +579,22 @@ enum ScheduledBackup {
             }
             p.waitUntilExit()
             guard p.terminationStatus == 0 else {
+                // Pausing stops the copy; that is not a failure.
+                if BackupState.paused { write("=== paused"); return 0 }
                 write("FAIL: \(what) exited \(p.terminationStatus)")
-                return notify(what == "backup" ? tr("Some folders were not copied to the cloud.", "일부 폴더를 클라우드에 복사하지 못했어요.")
-                                               : tr("The cloud copy differs from the folders.", "클라우드 사본이 폴더와 달라요."))
+                let reason = what == "backup" ? tr("Some folders were not copied to the cloud.", "일부 폴더를 클라우드에 복사하지 못했어요.")
+                                              : tr("The cloud copy differs from the folders.", "클라우드 사본이 폴더와 달라요.")
+                guard ifDue else { return notify(reason) }
+                if let alert = rules(["fail", reason]).first { _ = notify(alert, prefixed: false) }
+                return 1
             }
         }
+        _ = rules(["ok"])
         write("=== ok")
         return 0
     }
 
-    private static func notify(_ message: String) -> Int32 {
+    private static func notify(_ message: String, prefixed: Bool = true) -> Int32 {
         if let file = ProcessInfo.processInfo.environment["LAZYMAC_DAILY_NOTIFY_FILE"], !file.isEmpty {
             let line = Data("\(message)\n".utf8)
             if let h = FileHandle(forWritingAtPath: file) { h.seekToEndOfFile(); h.write(line); try? h.close() }

@@ -16,6 +16,7 @@ mkdir -p "$HOME"
 export LAZYMAC_REPO=none LAZYMAC_LAUNCHAGENTS_DIR=$TMP/agents LAZYMAC_LAUNCHCTL=$TMP/launchctl
 export LAZYMAC_BACKUP_CONF=$TMP/conf/backup.conf LAZYMAC_BACKUP_SCRIPT=$REPO/bin/nogit-backup.sh
 export LAZYMAC_DAILY_LOGDIR=$TMP/logs LAZYMAC_DAILY_NOTIFY_FILE=$TMP/notified RCLONE_CONFIG=$TMP/rclone.conf
+export LAZYMAC_STATE=$TMP/state LAZYMAC_NET=free
 print -r -- '#!/bin/zsh
 exit 0' > $TMP/launchctl
 chmod +x $TMP/launchctl
@@ -43,4 +44,27 @@ folder $TMP/src/gone" > $LAZYMAC_BACKUP_CONF
 set +e; $BIN --run-backup; c=$?; set -e
 check "a failed run exits 1, logs FAIL and reports one line" \
   "[[ $c == 1 ]] && grep -q 'FAIL: backup' $TMP/logs/*.log && [[ \$(wc -l < $TMP/notified) -eq 1 ]]"
+
+print -r -- "remote :local:$TMP/cloud
+folder $TMP/src/a" > $LAZYMAC_BACKUP_CONF
+rm -f $TMP/notified $TMP/state
+mkfifo $TMP/ready $TMP/go
+: >> $TMP/logs/backup.lock
+zsh -c 'zmodload zsh/system; zsystem flock -f fd "$1"; print locked > "$2"; read -r < "$3"' _ $TMP/logs/backup.lock $TMP/ready $TMP/go &
+holder=$!
+read -r < $TMP/ready
+set +e; $BIN --run-backup --if-due; c1=$?; $BIN --run-backup; c2=$?; set -e
+print go > $TMP/go
+wait $holder
+check "while daily.sh holds the backup lock, an automatic folder run skips quietly" \
+  "[[ $c1 == 0 ]] && grep -q 'skip: running (pid $holder)' $TMP/logs/*.log"
+check "and one started by hand fails and says so" "[[ $c2 == 1 ]] && grep -q 'another backup is still running' $TMP/logs/*.log && [[ -s $TMP/notified ]]"
+
+rm -f $TMP/notified
+set +e; $BIN --run-backup --if-due; c=$?; set -e
+check "an automatic folder run backs up and records the success for the catch-up rules" \
+  "[[ $c == 0 ]] && grep -q '^last-success ' $TMP/state && [[ ! -e $TMP/notified ]]"
+print paused 1 >> $TMP/state
+set +e; $BIN --run-backup; c=$?; set -e
+check "paused: a folder run does not back up" "[[ $c == 0 && \$(tail -1 $TMP/logs/*.log) == *'skip: paused' ]]"
 exit $fail

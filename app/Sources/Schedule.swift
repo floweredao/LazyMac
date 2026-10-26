@@ -5,6 +5,8 @@ import Foundation
 // and copies its folders); without them it runs `lazymac --run-backup`, which copies the folders in backup.conf.
 // Turning it on writes ~/Library/LaunchAgents/local.lazymac-daily.plist and loads it; turning it off unloads
 // and removes it. Changing the schedule keeps every other key of an existing plist.
+// The job also starts at login (RunAtLoad) and every 30 minutes (StartInterval) with --if-due, so a backup missed
+// while the Mac was off, asleep, logged out or offline runs as soon as it can (bin/due.sh decides).
 
 struct BackupSchedule: Equatable {
     enum Frequency: String, CaseIterable, Identifiable {
@@ -143,9 +145,9 @@ enum AutoBackup {
         let program: [String]
         if repo != nil, let code = Tools.codeRoot, let bun = bunPath() {
             let script = code.appendingPathComponent("bin/daily.sh").path.replacingOccurrences(of: "'", with: "'\\''")
-            program = [bun, "exec", "/bin/zsh '\(script)'"]
+            program = [bun, "exec", "/bin/zsh '\(script)' --if-due"]
         } else if let exe = Bundle.main.executablePath {
-            program = [exe, "--run-backup"]
+            program = [exe, "--run-backup", "--if-due"]
         } else {
             throw Failure(message: tr("Cannot find this app's program to run the backup.", "백업을 돌릴 이 앱의 프로그램을 찾지 못했어요."))
         }
@@ -202,7 +204,6 @@ enum AutoBackup {
             throw Failure(message: tr("A backup is running right now. Change the schedule after it finishes.",
                                       "지금 백업이 도는 중이에요. 끝난 뒤에 바꿔 주세요."))
         }
-        let fm = FileManager.default
         var dict: [String: Any]
         if let data = try? Data(contentsOf: plistURL),
            let existing = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
@@ -212,7 +213,36 @@ enum AutoBackup {
         }
         let intervals = schedule.intervals
         dict["StartCalendarInterval"] = intervals.count == 1 ? intervals[0] as Any : intervals as Any
-        dict.removeValue(forKey: "StartInterval")
+        try write(catchUp(dict))
+    }
+
+    static let checkEvery = 1800
+
+    /// The keys that make a missed backup run later: start at login and every 30 minutes, and pass --if-due.
+    static func catchUp(_ plist: [String: Any]) -> [String: Any] {
+        var dict = plist
+        dict["RunAtLoad"] = true
+        dict["StartInterval"] = checkEvery
+        dict["AssociatedBundleIdentifiers"] = ["com.floweredao.lazymac"]
+        if var args = dict["ProgramArguments"] as? [String], !args.contains(where: { $0 == "--if-due" || $0.hasSuffix(" --if-due") }) {
+            if args.count == 3, args[1] == "exec" { args[2] += " --if-due" } else { args.append("--if-due") }
+            dict["ProgramArguments"] = args
+        }
+        return dict
+    }
+
+    /// A job written by an older LazyMac gets the catch-up keys once, when no backup is running.
+    @discardableResult
+    static func upgradeIfNeeded() -> Bool {
+        guard let data = try? Data(contentsOf: plistURL),
+              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else { return false }
+        let updated = catchUp(dict)
+        guard !NSDictionary(dictionary: updated).isEqual(to: dict), !isRunning else { return false }
+        return (try? write(updated)) != nil
+    }
+
+    private static func write(_ dict: [String: Any]) throws {
+        let fm = FileManager.default
         if let log = dict["StandardOutPath"] as? String {
             try? fm.createDirectory(atPath: (log as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         }
@@ -234,5 +264,11 @@ enum AutoBackup {
         }
         _ = launchctl(["bootout", "\(domain)/\(BackupSchedule.label)"])
         if FileManager.default.fileExists(atPath: plistURL.path) { try FileManager.default.removeItem(at: plistURL) }
+    }
+
+    /// Starts the job now (it still backs up only when one is due), e.g. right after backups are resumed.
+    static func checkNow() {
+        guard FileManager.default.fileExists(atPath: plistURL.path) else { return }
+        _ = launchctl(["kickstart", "\(domain)/\(BackupSchedule.label)"])
     }
 }
