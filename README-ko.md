@@ -16,7 +16,7 @@ LazyMac은 맥에 있는 앱, 도구, 설정, 로그인 정보를 목록으로 �
 - **단계별 복원**: 가져올 것을 고르고, 확인하고, 설치해요.
 - **아무것도 지우지 않아요**: 백업은 파일을 지우지 않고, 복원은 있는 파일을 덮어쓰지 않아요.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/app-ko-dark.png"><img src="docs/app-ko.png" width="720" alt="LazyMac 백업 화면"></picture>
+<img src="docs/app-ko.png" width="720" alt="LazyMac 백업 화면">
 
 ## 설치
 
