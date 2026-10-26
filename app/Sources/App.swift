@@ -33,6 +33,23 @@ enum Main {
             print(NetworkStatus.current().rawValue)
             return
         }
+        // Test hook: what the Status card shows, one `key value` line each (epoch seconds); tests/status.sh.
+        if args.contains("--backup-status") {
+            let s = BackupStatus.read(app: nil, main: true, folders: false)
+            let phase: String = switch s.phase {
+            case .running: "running"
+            case .paused: "paused"
+            case .retrying(let after): "retrying \(Int(after.timeIntervalSince1970))"
+            case .waiting(let offline): offline ? "waiting offline" : "waiting metered"
+            case .missed(let slot): "missed \(Int(slot.timeIntervalSince1970))"
+            case .upToDate: "uptodate"
+            case .off: "off"
+            }
+            print("phase \(phase)")
+            if let n = s.next { print("next \(Int(n.timeIntervalSince1970))") }
+            if let p = s.problem { print("problem \(p.reason)") }
+            return
+        }
         LazymacApp.main()
     }
 

@@ -12,14 +12,16 @@ struct OverviewView: View {
     @Environment(MacBackup.self) private var mac
     @State private var parts = BackupParts()
     @State private var last = DailyLog.latest()
+    @State private var status = BackupStatus(phase: .off)
 
     var body: some View {
         Group {
             if storage.config.hasPlace && storage.config.isInitialized {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        StatusHeader(last: last)
+                        StatusHeader(last: last, backupStatus: status)
                         Form {
+                            StatusSection(status: status)
                             if mac.running || mac.outcome?.ok == false { RunStepsSection() }
                             PartsSection(parts: parts)
                             DetailsSection(last: last)
@@ -39,10 +41,24 @@ struct OverviewView: View {
         .onChange(of: mac.running) { if !mac.running { reload() } }
         .onChange(of: backup.job) { if backup.job == nil { reload() } }
         .onChange(of: storage.config) { reload() }
+        .onChange(of: mac.doneCount) { readStatus() }
+        .onChange(of: mac.paused) { readStatus() }
+        .onChange(of: model.backupInstalled) { readStatus() }
+        // A backup launchd started shows up and moves along without a click.
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in readStatus() }
+    }
+
+    private func readStatus() {
+        let next = BackupStatus.read(app: mac, main: model.role == .main, folders: storage.config.files)
+        guard next != status else { return }
+        let ended = status.isRunning && !next.isRunning
+        status = next
+        if ended { last = DailyLog.latest() }
     }
 
     private func reload() {
         mac.reloadState()
+        readStatus()
         backup.refresh()
         model.reloadBackup()
         last = DailyLog.latest()
@@ -57,7 +73,15 @@ struct StatusHeader: View {
     @Environment(StorageModel.self) private var storage
     @Environment(MacBackup.self) private var mac
     let last: DailyLog?
+    let backupStatus: BackupStatus
     @State private var askMetered = false
+
+    /// A backup this window started, or one launchd started (read from its log).
+    private var running: (on: Bool, step: MacBackup.Step?) {
+        if mac.running { return (true, mac.currentStep) }
+        if case .running(let step, _, _) = backupStatus.phase { return (true, step) }
+        return (false, nil)
+    }
     private struct Status {
         let kind: StatusLabel.Kind
         let text: String
@@ -88,7 +112,7 @@ struct StatusHeader: View {
     }
 
     private var canBackUp: Bool {
-        !mac.running && !mac.paused && !backup.busy && storage.config.place?.connected != false && Helper.missing(main: model.role == .main).isEmpty
+        !running.on && !mac.paused && !backup.busy && storage.config.place?.connected != false && Helper.missing(main: model.role == .main).isEmpty
     }
 
     private func backUp() {
@@ -106,10 +130,10 @@ struct StatusHeader: View {
                 .font(AppText.largeTitle.weight(.bold))
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: Space.s) {
-                if mac.running {
+                if running.on {
                     HStack(spacing: Space.m) {
                         ProgressView().controlSize(.small)
-                        Text(mac.currentStep.map { tr("Backing up: \($0.title)…", "백업하는 중: \($0.title)…") } ?? tr("Starting the backup…", "백업을 시작하는 중…"))
+                        Text(running.step.map { tr("Backing up: \($0.title)…", "백업하는 중: \($0.title)…") } ?? tr("Starting the backup…", "백업을 시작하는 중…"))
                             .font(AppText.title3.weight(.semibold))
                     }
                 } else {
@@ -122,7 +146,7 @@ struct StatusHeader: View {
                             "다시 켜기 전까지는 자동 백업도, 버튼으로 하는 백업도 하지 않아요."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if mac.waitingForFreeNetwork && !mac.running {
+                } else if mac.waitingForFreeNetwork && !running.on {
                     Text(tr("The automatic backup is waiting because this connection may charge for data. Back Up This Mac backs up now anyway.",
                             "데이터 요금이 드는 연결이라 자동 백업이 기다리고 있어요. '이 맥 백업하기'를 누르면 지금 백업해요."))
                         .foregroundStyle(.secondary)
@@ -154,7 +178,7 @@ struct StatusHeader: View {
                             Label(tr("Pause Backups", "백업 멈추기"), systemImage: "pause.fill")
                         }
                         .controlSize(.large)
-                        .help(mac.running ? tr("Stops this backup safely and keeps every backup from starting until you resume.",
+                        .help(running.on ? tr("Stops this backup safely and keeps every backup from starting until you resume.",
                                                "지금 백업을 안전하게 멈추고, 다시 켜기 전까지 어떤 백업도 시작하지 않아요.")
                                           : tr("Keeps every backup, automatic ones too, from starting until you resume.",
                                                "다시 켜기 전까지 자동 백업을 포함해 어떤 백업도 시작하지 않아요."))

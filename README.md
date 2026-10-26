@@ -65,6 +65,8 @@ LazyMac installs a LaunchAgent (`local.lazymac-daily`) that runs the same backup
 
 **Hotspots and Low Data Mode.** Turn on **Wait on connections that may charge for data** in **Schedule** to keep automatic backups from running there (off at first). **Back Up This Mac** still works: it asks first, then backs up.
 
+**Status** on the **Back Up** screen shows, at a glance, whether backups are up to date, running (with the step and progress, also for a backup that started while LazyMac was closed), behind schedule and why, or paused; the last successful backup; the next one; the last problem; and how full the backup place is.
+
 **Pause Backups** on the **Back Up** screen stops a running backup at a safe point (a cut-short copy leaves no half-written file) and keeps automatic and manual backups from starting until you click **Resume Backups**.
 
 ## Restore to a new Mac
