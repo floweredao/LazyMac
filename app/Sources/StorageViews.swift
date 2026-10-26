@@ -274,6 +274,7 @@ struct AdvancedView: View {
     @Environment(SetupModel.self) private var model
     @Environment(BackupModel.self) private var backup
     @Environment(StorageModel.self) private var storage
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Form {
@@ -308,6 +309,12 @@ struct AdvancedView: View {
                 )
             } header: {
                 Text(tr("This Mac", "이 맥"))
+            }
+
+            Section {
+                Button(tr("Show Welcome Again…", "시작 안내 다시 보기…")) { openWindow(id: Onboarding.windowID) }
+            } header: {
+                Text(tr("Welcome", "시작 안내"))
             }
 
             if !storage.config.isInitialized {

@@ -12,12 +12,10 @@ struct OverviewView: View {
     @Environment(MacBackup.self) private var mac
     @State private var parts = BackupParts()
     @State private var last = DailyLog.latest()
-    /// Set when the first backup starts from the first-run flow, so the flow stays until the passwords step is done.
-    @AppStorage("firstRunLockPending") private var lockPending = false
 
     var body: some View {
         Group {
-            if storage.config.hasPlace && storage.config.isInitialized && !lockPending {
+            if storage.config.hasPlace && storage.config.isInitialized {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         StatusHeader(last: last)
@@ -453,10 +451,8 @@ struct DetailsSection: View {
 
 // MARK: - First run
 
-/// Three steps for a Mac that has no backup yet: choose where backups go, back up, then lock passwords.
+/// Two steps for a Mac that has no backup yet: choose where backups go, then back up.
 struct FirstRunView: View {
-    @AppStorage("firstRunLockPending") private var lockPending = false
-    @Environment(\.consoleSheet) private var consoleSheet
     @Environment(SetupModel.self) private var model
     @Environment(BackupModel.self) private var backup
     @Environment(StorageModel.self) private var storage
@@ -466,7 +462,6 @@ struct FirstRunView: View {
     @State private var working = false
 
     private var place: StorageConfig.Place? { storage.config.place }
-    private var backedUp: Bool { storage.config.isInitialized && lockPending && !mac.running }
     private var placeReady: Bool {
         guard let place else { return false }
         if place.drive { return backup.rclonePath != nil && backup.remotes.contains(backup.config.remoteName) }
@@ -519,7 +514,7 @@ struct FirstRunView: View {
                         .fixedSize()
                     }
                 }
-                FirstRunStep(number: 2, done: backedUp, active: placeReady && !backedUp, title: tr("Back up now", "지금 백업하기")) {
+                FirstRunStep(number: 2, done: false, active: placeReady, title: tr("Back up now", "지금 백업하기")) {
                     Text(hasBackup
                          ? tr("This place already has a LazyMac backup. LazyMac uses its list on this Mac and adds this Mac to it.",
                               "이 장소에는 이미 LazyMac 백업이 있어요. 그 목록을 이 맥에서 쓰고, 이 맥도 함께 저장해요.")
@@ -533,49 +528,13 @@ struct FirstRunView: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
                             .keyboardShortcut(placeReady ? .defaultAction : nil)
-                            .disabled(backedUp || !placeReady || working || mac.running || !Helper.missing(main: !hasBackup).isEmpty)
+                            .disabled(!placeReady || working || mac.running || !Helper.missing(main: !hasBackup).isEmpty)
                             .fixedSize()
                         if working || storage.busy { ProgressView().controlSize(.small) }
                     }
                     if let message = storage.message, !storage.initialized, !working {
                         StatusLabel(kind: .info, text: message)
                     }
-                }
-                FirstRunStep(number: 3, done: false, active: backedUp, title: tr("Lock your passwords", "비밀번호 잠그기")) {
-                    Text(tr("LazyMac can lock your sign-in keys, like SSH keys and GitHub sign-ins, with a passphrase you choose. Write the passphrase down somewhere safe: without it nobody can open them, not even LazyMac.",
-                            "SSH 키, GitHub 로그인 같은 로그인 키를 직접 정한 암호로 잠가 둘 수 있어요. 암호는 안전한 곳에 꼭 적어 두세요. 암호가 없으면 LazyMac도 열 수 없어요."))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: Space.l) {
-                        if Helper.age.path == nil {
-                            Button(tr("Install age", "age 설치")) {
-                                backup.install([.age])
-                                consoleSheet.wrappedValue = true
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                            .disabled(!backedUp || backup.busy)
-                            .fixedSize()
-                        } else {
-                            Button(tr("Lock Passwords…", "비밀번호 잠그기…")) {
-                                backup.lockSecrets(startList: true)
-                                consoleSheet.wrappedValue = true
-                                lockPending = false
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                            .keyboardShortcut(backedUp ? .defaultAction : nil)
-                            .disabled(!backedUp || backup.busy)
-                            .fixedSize()
-                        }
-                        Button(tr("Later", "나중에")) { lockPending = false }
-                            .buttonStyle(.link)
-                            .disabled(!backedUp)
-                            .fixedSize()
-                    }
-                    Text(tr("You can do this any time from Back Up > This Mac.", "나중에 백업 > 이 맥에서 언제든 할 수 있어요."))
-                        .font(AppText.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: Metrics.firstRunWidth, alignment: .leading)
@@ -595,7 +554,6 @@ struct FirstRunView: View {
         Task {
             defer { working = false }
             if !storage.config.isInitialized {
-                lockPending = true
                 await storage.initialize(hasBackup ? .restore : .new)
                 guard storage.initialized else { return }
                 model.use(repo: storage.config.dataURL)
