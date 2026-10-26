@@ -16,7 +16,7 @@ LazyMac keeps a list of the apps, tools, settings, and sign-ins on your Mac and 
 - **Step-by-step restore**: pick what to bring, review it, and install.
 - **Nothing is deleted**: backups never remove files, and restores never overwrite yours.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/app-dark.png"><img src="docs/app.png" width="720" alt="LazyMac Back Up screen"></picture>
+<img src="docs/app.png" width="720" alt="LazyMac Back Up screen">
 
 ## Install
 
