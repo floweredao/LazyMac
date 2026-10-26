@@ -17,7 +17,8 @@ Years of old files and leftovers stay behind.
 
 - **Clean install on a new Mac**: pick what to bring, review it, and install.
 - **One-click backup** to Google Drive by default, or to a folder or external disk.
-- **Automatic backups** every hour, day, or week, even when the app is closed.
+- **Automatic backups** every hour, day, or week, even when the app is closed. A backup missed while the Mac was off, asleep, or offline runs once as soon as it can.
+- **Pause anytime**: one button stops a running backup safely and keeps every backup waiting until you resume.
 - **Passwords locked with your passphrase** in one encrypted file.
 - **Folder backup is optional**: copying folders such as projects is off until you turn it on.
 - **Nothing is deleted**: backups never remove files, and restores never overwrite yours.
@@ -59,6 +60,12 @@ Every backup is checked with `gitleaks` before it is saved, so a stray password 
 3. Click the shortcut to give LazyMac **Full Disk Access**, so background backups can read every folder.
 
 LazyMac installs a LaunchAgent (`local.lazymac-daily`) that runs the same backup when the app is closed. The **Back Up** screen shows the last result. If a backup fails, it says why in plain words (for example "Your backup disk is not connected") with a button to fix it. Logs are kept for 30 days in `~/Library/Logs/lazymac-daily/`.
+
+**Missed backups.** The job also checks at login and every 30 minutes. If the Mac was off, asleep, logged out, or offline at the scheduled time, it backs up once when it can, however many times were missed. A minute after waking it waits for Wi-Fi. If that catch-up ran less than half a period before the next scheduled time, the next one is skipped. A failed automatic backup tries again after 15 minutes, then 30, 60, and 120. You get one notification per bad stretch: after three failures in a row, or when the last backup is more than two periods old.
+
+**Hotspots and Low Data Mode.** Turn on **Wait on connections that may charge for data** in **Schedule** to keep automatic backups from running there (off at first). **Back Up This Mac** still works: it asks first, then backs up.
+
+**Pause Backups** on the **Back Up** screen stops a running backup at a safe point (a cut-short copy leaves no half-written file) and keeps automatic and manual backups from starting until you click **Resume Backups**.
 
 ## Restore to a new Mac
 

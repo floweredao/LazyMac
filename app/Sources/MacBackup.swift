@@ -171,6 +171,10 @@ final class MacBackup {
     private(set) var lines: [String] = []
     private(set) var outcome: Outcome?
     private(set) var startProblem: String?
+    /// Backups wait until resumed: the automatic ones, and this button. Kept in the schedule-state file.
+    private(set) var paused = BackupState.paused
+    /// The last automatic start waited because the connection may charge for data (only when waiting is turned on).
+    private(set) var waitingForFreeNetwork = false
 
     @ObservationIgnored var onFinish: (() -> Void)?
     @ObservationIgnored private var timer: Timer?
@@ -178,19 +182,40 @@ final class MacBackup {
     @ObservationIgnored private var offset: UInt64 = 0
     @ObservationIgnored private var reason: String?
     @ObservationIgnored private var notifyFile: URL?
+    @ObservationIgnored private var stoppedByPause = false
 
     var currentStep: Step? { steps.first { states[$0] == .running } }
     var doneCount: Int { steps.filter { states[$0] == .done }.count }
 
+    func reloadState() {
+        paused = BackupState.paused
+        waitingForFreeNetwork = !paused && BackupState.waitsOnMetered && BackupState.deferred == "metered"
+    }
+
+    /// Stops a running backup at a safe point and keeps every backup from starting until `resume()`.
+    func pause() {
+        BackupState.set("paused", String(Int(Date().timeIntervalSince1970)))
+        BackupLock.stopCopies()
+        reloadState()
+    }
+
+    func resume() {
+        BackupState.set("paused", nil)
+        reloadState()
+        AutoBackup.checkNow()
+    }
+
     func start(main: Bool, folders: Bool) {
         guard !running else { return }
         startProblem = nil
+        reloadState()
+        guard !paused else { return }
         guard let script = Tools.script("daily.sh") else {
             startProblem = tr("This copy of LazyMac is missing its backup script.", "이 LazyMac에 백업 스크립트가 없어요.")
             return
         }
-        if AutoBackup.isRunning {
-            startProblem = tr("An automatic backup is running right now. Try again when it is done.", "지금 자동 백업이 도는 중이에요. 끝난 뒤에 다시 눌러 주세요.")
+        if BackupLock.holder() != nil {
+            startProblem = tr("A backup is running right now. Try again when it is done.", "지금 백업이 도는 중이에요. 끝난 뒤에 다시 눌러 주세요.")
             return
         }
         steps = main ? [.refresh, .scan, .list, .settings, .copy] : [.refresh, .scan, .copy]
@@ -199,6 +224,7 @@ final class MacBackup {
         lines = []
         outcome = nil
         reason = nil
+        stoppedByPause = false
         let log = DailyLog.dir.appendingPathComponent(DailyLog.fileName(for: .now))
         logURL = log
         offset = ((try? FileManager.default.attributesOfItem(atPath: log.path))?[.size] as? NSNumber)?.uint64Value ?? 0
@@ -255,6 +281,8 @@ final class MacBackup {
             states[step] = .running
         } else if body.hasPrefix("FAIL: ") {
             reason = String(body.dropFirst(6))
+        } else if body == "=== paused" {
+            stoppedByPause = true
         }
     }
 
@@ -262,18 +290,25 @@ final class MacBackup {
         readLog()
         timer?.invalidate()
         timer = nil
+        if status != 0, reason == nil, let notifyFile, let text = try? String(contentsOf: notifyFile, encoding: .utf8) {
+            reason = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let notifyFile { try? FileManager.default.removeItem(at: notifyFile) }
+        notifyFile = nil
+        running = false
+        reloadState()
+        if stoppedByPause {
+            for s in steps where states[s] != .done { states[s] = .waiting }
+            outcome = nil
+            onFinish?()
+            return
+        }
         if status == 0 {
             for s in steps { states[s] = .done }
         } else {
             for s in steps where states[s] == .running { states[s] = .failed }
-            if reason == nil, let notifyFile, let text = try? String(contentsOf: notifyFile, encoding: .utf8) {
-                reason = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
         }
-        if let notifyFile { try? FileManager.default.removeItem(at: notifyFile) }
-        notifyFile = nil
         outcome = Outcome(ok: status == 0, reason: status == 0 ? nil : (reason ?? "exit \(status)"), date: .now)
-        running = false
         onFinish?()
     }
 }

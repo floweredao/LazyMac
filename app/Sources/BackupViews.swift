@@ -42,6 +42,7 @@ struct OverviewView: View {
     }
 
     private func reload() {
+        mac.reloadState()
         backup.refresh()
         model.reloadBackup()
         last = DailyLog.latest()
@@ -56,7 +57,7 @@ struct StatusHeader: View {
     @Environment(StorageModel.self) private var storage
     @Environment(MacBackup.self) private var mac
     let last: DailyLog?
-
+    @State private var askMetered = false
     private struct Status {
         let kind: StatusLabel.Kind
         let text: String
@@ -64,6 +65,10 @@ struct StatusHeader: View {
     }
 
     private var status: Status {
+        if mac.paused {
+            let since = BackupState.pausedSince.map { tr(" since \(whenPhrase($0))", " (\(whenPhrase($0))부터)") } ?? ""
+            return Status(kind: .info, text: tr(since.isEmpty ? "Backups are paused." : "Backups have been paused\(since).", "백업을 멈춰 두었어요\(since)."), problem: nil)
+        }
         if let place = storage.config.place, !place.connected, let disk = place.disk {
             return Status(kind: .problem, text: tr("Your backup disk “\(disk)” is not connected.", "백업 디스크 “\(disk)”가 연결되어 있지 않아요."),
                           problem: BackupProblem(text: tr("Connect it to back up, or choose another place.", "디스크를 연결하거나 다른 곳을 골라 주세요."), fix: .choosePlace))
@@ -83,7 +88,15 @@ struct StatusHeader: View {
     }
 
     private var canBackUp: Bool {
-        !mac.running && !backup.busy && storage.config.place?.connected != false && Helper.missing(main: model.role == .main).isEmpty
+        !mac.running && !mac.paused && !backup.busy && storage.config.place?.connected != false && Helper.missing(main: model.role == .main).isEmpty
+    }
+
+    private func backUp() {
+        let start = { mac.start(main: model.role == .main, folders: storage.config.files) }
+        guard BackupState.waitsOnMetered else { return start() }
+        Task {
+            if await NetworkStatus.check() == .metered { askMetered = true } else { start() }
+        }
     }
 
     var body: some View {
@@ -104,23 +117,60 @@ struct StatusHeader: View {
                         .font(AppText.title3.weight(.semibold))
                     if let problem = status.problem { ProblemLine(problem: problem) }
                 }
+                if mac.paused {
+                    Text(tr("Nothing backs up, automatically or with the button, until you resume.",
+                            "다시 켜기 전까지는 자동 백업도, 버튼으로 하는 백업도 하지 않아요."))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if mac.waitingForFreeNetwork && !mac.running {
+                    Text(tr("The automatic backup is waiting because this connection may charge for data. Back Up This Mac backs up now anyway.",
+                            "데이터 요금이 드는 연결이라 자동 백업이 기다리고 있어요. '이 맥 백업하기'를 누르면 지금 백업해요."))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 PlaceLine()
             }
             MissingHelpersLine()
             AdaptiveRow {
-                Button {
-                    mac.start(main: model.role == .main, folders: storage.config.files)
-                } label: {
-                    Text(tr("Back Up This Mac", "이 맥 백업하기")).frame(minWidth: 150 * TextScale.current)
+                HStack(spacing: Space.m) {
+                    if mac.paused {
+                        Button { mac.resume() } label: {
+                            Label(tr("Resume Backups", "백업 다시 켜기"), systemImage: "play.fill").frame(minWidth: 150 * TextScale.current)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .keyboardShortcut(.defaultAction)
+                        .fixedSize()
+                    } else {
+                        Button(action: backUp) {
+                            Text(tr("Back Up This Mac", "이 맥 백업하기")).frame(minWidth: 150 * TextScale.current)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(!canBackUp)
+                        .fixedSize()
+                        Button(action: mac.pause) {
+                            Label(tr("Pause Backups", "백업 멈추기"), systemImage: "pause.fill")
+                        }
+                        .controlSize(.large)
+                        .help(mac.running ? tr("Stops this backup safely and keeps every backup from starting until you resume.",
+                                               "지금 백업을 안전하게 멈추고, 다시 켜기 전까지 어떤 백업도 시작하지 않아요.")
+                                          : tr("Keeps every backup, automatic ones too, from starting until you resume.",
+                                               "다시 켜기 전까지 자동 백업을 포함해 어떤 백업도 시작하지 않아요."))
+                        .fixedSize()
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canBackUp)
-                .fixedSize()
             } trailing: {
                 ScheduleLine()
             }
+        }
+        .confirmationDialog(tr("This connection may charge for data", "데이터 요금이 드는 연결이에요"), isPresented: $askMetered) {
+            Button(tr("Back Up Now", "지금 백업")) { mac.start(main: model.role == .main, folders: storage.config.files) }
+            Button(tr("Cancel", "취소"), role: .cancel) {}
+        } message: {
+            Text(tr("This Mac is on a hotspot or in Low Data Mode, so automatic backups wait. Backing up now can use a lot of data.",
+                    "이 맥이 핫스팟이나 저데이터 모드라서 자동 백업은 기다려요. 지금 백업하면 데이터를 많이 쓸 수 있어요."))
         }
         .frame(maxWidth: Metrics.contentWidth, alignment: .leading)
         .padding(.horizontal, Space.page)
@@ -964,7 +1014,16 @@ struct ScheduleView: View {
                 } header: {
                     Text(tr("Automatic backup", "자동 백업"))
                 } footer: {
-                    FooterText(whatRuns)
+                    FooterText(whatRuns + " " + catchUp)
+                }
+
+                if model.backupOn {
+                    Section {
+                        Toggle(tr("Wait on connections that may charge for data", "데이터 요금이 드는 연결에서는 기다리기"), isOn: $model.backupWaitMetered)
+                    } footer: {
+                        FooterText(tr("On a phone's hotspot or in Low Data Mode, automatic backups wait for another connection. Back Up This Mac still backs up when you ask.",
+                                      "휴대폰 핫스팟이나 저데이터 모드에서는 자동 백업이 다른 연결을 기다려요. '이 맥 백업하기'를 누르면 그래도 백업해요."))
+                    }
                 }
 
                 Section(tr("Now", "지금")) {
@@ -999,6 +1058,11 @@ struct ScheduleView: View {
             }
         }
         .onAppear { model.reloadBackup() }
+    }
+
+    var catchUp: String {
+        tr("If this Mac is asleep, off or offline at that time, it backs up once as soon as it can.",
+           "그 시각에 맥이 잠들었거나 꺼져 있거나 인터넷이 없으면, 할 수 있게 되는 대로 한 번 백업해요.")
     }
 
     var whatRuns: String {

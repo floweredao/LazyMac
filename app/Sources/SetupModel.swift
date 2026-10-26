@@ -331,15 +331,22 @@ final class SetupModel {
     private(set) var backupInstalled: BackupSchedule?
     var backupOn = false
     var backupDraft = BackupSchedule()
+    /// Automatic backups wait on a hotspot or in Low Data Mode (bin/due.sh). Off unless the person turns it on.
+    var backupWaitMetered = false
+    private(set) var backupWaitMeteredSaved = false
     private(set) var backupStatus: String?
     private(set) var backupBusy = false
 
-    var backupDirty: Bool { backupOn != (backupInstalled != nil) || (backupOn && backupDraft != backupInstalled) }
+    var backupDirty: Bool {
+        backupOn != (backupInstalled != nil) || (backupOn && (backupDraft != backupInstalled || backupWaitMetered != backupWaitMeteredSaved))
+    }
 
     func reloadBackup() {
         backupInstalled = AutoBackup.current()
         backupOn = backupInstalled != nil
         backupDraft = backupInstalled ?? BackupSchedule()
+        backupWaitMeteredSaved = BackupState.waitsOnMetered
+        backupWaitMetered = backupWaitMeteredSaved
     }
 
     func applyBackup() {
@@ -350,6 +357,7 @@ final class SetupModel {
         do {
             if backupOn {
                 try AutoBackup.install(draft, repo: repo)
+                BackupState.set("metered", backupWaitMetered ? "wait" : nil)
                 backupStatus = tr("Auto backup is on: \(draft.summary)", "자동 백업을 켰어요: \(draft.summary)")
             } else {
                 try AutoBackup.remove()

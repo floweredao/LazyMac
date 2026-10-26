@@ -16,6 +16,7 @@ BUNDLE=$OUT/LazyMac.app
 mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 cp "$BIN" "$BUNDLE/Contents/MacOS/lazymac"
 cp "$APP/../bin/nogit-backup.sh" "$BUNDLE/Contents/Resources/nogit-backup.sh"
+cp "$APP/../bin/due.sh" "$BUNDLE/Contents/Resources/due.sh"
 sed "s/__VERSION__/$VERSION/g" "$APP/Info.plist" > "$BUNDLE/Contents/Info.plist"
 swift "$APP/icon.swift" "$OUT/lazymac.iconset"
 iconutil -c icns "$OUT/lazymac.iconset" -o "$BUNDLE/Contents/Resources/lazymac.icns"
