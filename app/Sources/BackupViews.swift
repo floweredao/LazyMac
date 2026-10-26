@@ -1,132 +1,650 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Back Up > Overview
+// MARK: - Back Up > This Mac
 
+/// The home screen. Until a backup place is chosen and the list exists it is the first-run flow; then it shows
+/// how the last backup went, the one Back Up This Mac button, and what a backup holds.
 struct OverviewView: View {
     @Environment(SetupModel.self) private var model
     @Environment(BackupModel.self) private var backup
+    @Environment(StorageModel.self) private var storage
+    @Environment(MacBackup.self) private var mac
+    @State private var parts = BackupParts()
+    @State private var last = DailyLog.latest()
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    PageHeader(title: tr("Back Up", "백업"),
-                               subtitle: tr("Your apps and settings list lives in your data folder and is copied to the selected storage. Folder backup is optional.",
-                                            "앱과 설정 목록은 데이터 폴더에 두고 선택한 저장소로 복사해요. 폴더 백업은 원할 때 켤 수 있어요."))
-                    Form {
-                        StorageStatusSection()
-                        if !backup.configured && model.repo == nil {
-                            Section(tr("Get started", "시작하기")) {
-                                StartRow(symbol: "folder", title: tr("Back up this Mac", "이 맥 백업하기"),
-                                         detail: tr("Choose storage in Settings, then pick the folders to copy.", "설정에서 저장소를 고른 뒤 복사할 폴더를 골라요."),
-                                         button: tr("Set Up…", "설정…")) { model.page = .folders }
-                                StartRow(symbol: "arrow.down.doc", title: tr("Restore to this Mac", "이 맥으로 복원하기"),
-                                         detail: tr("Bring folders back from a backup made on another Mac.", "다른 맥에서 만든 백업에서 폴더를 되살려요."),
-                                         button: tr("Restore…", "복원…")) { model.page = .restoreFolders }
-                            }
+        Group {
+            if storage.config.hasPlace && storage.config.isInitialized {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        StatusHeader(last: last)
+                        Form {
+                            if mac.running || mac.outcome?.ok == false { RunStepsSection() }
+                            PartsSection(parts: parts)
+                            DetailsSection(last: last)
                         }
-                        Section {
-                            LabeledContent(tr("Copies go to", "복사하는 곳")) {
-                                Text(backup.hasRemote ? backup.config.remote : tr("Not set", "정하지 않음"))
-                                    .textSelection(.enabled)
-                            }
-                            LabeledContent(tr("Folders", "폴더")) {
-                                Text(backup.config.folders.isEmpty ? tr("None yet", "아직 없음") : folderCount(backup.config.folders.count))
-                            }
-                            RunRow(title: tr("Last check", "마지막 비교"), run: backup.lastCheck)
-                        } header: {
-                            Text(tr("Folders", "폴더"))
-                        } footer: {
-                            AdaptiveRow {
-                                Button(tr("Edit Folders…", "폴더 편집…")) { model.page = .folders }.fixedSize()
-                            } trailing: {
-                                Button(tr("Check", "비교")) { backup.check() }.fixedSize()
-                                    .disabled(!backup.ready || backup.busy)
-                                    .help(tr("Compares every folder with its backup, without copying", "복사하지 않고 폴더와 백업 사본을 비교해요"))
-                                Button(tr("Back Up Now", "지금 백업")) { backup.backUpNow() }.fixedSize()
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(!backup.ready || backup.busy)
-                            }
-                        }
-
-                        Section(tr("Schedule", "일정")) {
-                            LabeledContent(tr("Runs", "도는 때"), value: model.backupInstalled?.summary ?? tr("Off", "꺼짐"))
-                            if let last = DailyLog.latest() {
-                                LabeledContent(tr("Last scheduled run", "마지막 예약 실행")) {
-                                    HStack(spacing: 8) {
-                                        StatusLabel(kind: last.ok ? .ok : .problem,
-                                                    text: (last.ok ? tr("Done", "끝남") : tr("Failed", "실패")) + (last.date.map { " · " + $0.formatted(.relative(presentation: .named).locale(Lang.locale)) } ?? ""))
-                                        Button(tr("Show Log", "로그 보기")) { NSWorkspace.shared.open(last.url) }.fixedSize()
-                                            .buttonStyle(.link)
-                                    }
-                                }
-                                if !last.ok, !last.detail.isEmpty {
-                                    Text(last.detail).font(AppText.callout).foregroundStyle(.secondary).textSelection(.enabled)
-                                }
-                            }
-                        }
-
-                        if model.repo != nil {
-                            Section {
-                                LabeledContent(tr("This Mac", "이 맥"), value: Profiles.host)
-                                LabeledContent(tr("Role", "역할"), value: model.role == .main ? tr("Main Mac", "주 맥") : tr("Other Mac", "보조 맥"))
-                                if let status = model.scanStatus {
-                                    Text(status).font(AppText.callout).foregroundStyle(.secondary).textSelection(.enabled)
-                                }
-                            } header: {
-                                Text(tr("Apps and settings list", "앱과 설정 목록"))
-                            } footer: {
-                                AdaptiveRow {
-                                    FooterText(tr("Scanning reads this Mac (about a minute) and saves its inventory to your data folder and storage.",
-                                                  "훑기는 이 맥을 읽고(1분쯤) 기록을 데이터 폴더와 저장소에 저장해요."))
-                                } trailing: {
-                                    if model.scanning { ProgressView().controlSize(.small) }
-                                    Button(tr("Scan This Mac", "이 맥 훑기")) { Task { await model.scanThisMac() } }.fixedSize()
-                                        .disabled(model.scanning)
-                                }
-                            }
-                        }
+                        .formStyle(.grouped)
+                        .scrollDisabled(true)
+                        .frame(maxWidth: Metrics.contentWidth, alignment: .leading)
                     }
-                    .formStyle(.grouped)
-                    .scrollDisabled(true)
-                    .frame(maxWidth: 760, alignment: .leading)
-                    BackupConsole()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                FirstRunView()
             }
         }
-        .onAppear {
-            backup.refresh()
-            model.reloadBackup()
-        }
+        .consoleSheet()
+        .onAppear(perform: reload)
+        .onChange(of: mac.running) { if !mac.running { reload() } }
+        .onChange(of: backup.job) { if backup.job == nil { reload() } }
+        .onChange(of: storage.config) { reload() }
+    }
+
+    private func reload() {
+        backup.refresh()
+        model.reloadBackup()
+        last = DailyLog.latest()
+        parts = BackupParts.read(data: storage.config.dataURL, host: Profiles.host)
+        if storage.config.isInitialized, model.repo == nil { model.use(repo: storage.config.dataURL) }
     }
 }
 
-func folderCount(_ n: Int) -> String { tr(n == 1 ? "1 folder" : "\(n) folders", "\(n)개") }
+struct StatusHeader: View {
+    @Environment(SetupModel.self) private var model
+    @Environment(BackupModel.self) private var backup
+    @Environment(StorageModel.self) private var storage
+    @Environment(MacBackup.self) private var mac
+    let last: DailyLog?
 
-struct StartRow: View {
-    let symbol: String
-    let title: String
-    let detail: String
-    let button: String
-    let action: () -> Void
+    private struct Status {
+        let kind: StatusLabel.Kind
+        let text: String
+        let problem: BackupProblem?
+    }
+
+    private var status: Status {
+        if let place = storage.config.place, !place.connected, let disk = place.disk {
+            return Status(kind: .problem, text: tr("Your backup disk “\(disk)” is not connected.", "백업 디스크 “\(disk)”가 연결되어 있지 않아요."),
+                          problem: BackupProblem(text: tr("Connect it to back up, or choose another place.", "디스크를 연결하거나 다른 곳을 골라 주세요."), fix: .choosePlace))
+        }
+        if let problem = mac.startProblem { return Status(kind: .problem, text: problem, problem: nil) }
+        let outcome = mac.outcome.map { (ok: $0.ok, date: Optional($0.date), reason: $0.reason ?? "") }
+            ?? last.map { (ok: $0.ok, date: $0.date, reason: $0.detail) }
+        guard let outcome else {
+            return Status(kind: .info, text: tr("This Mac has not been backed up yet.", "이 맥은 아직 백업하지 않았어요."), problem: nil)
+        }
+        let when = outcome.date.map(whenPhrase) ?? tr("recently", "최근")
+        if outcome.ok {
+            return Status(kind: .ok, text: tr("Last backup: \(when). Everything is OK.", "마지막 백업: \(when), 모두 잘 됐어요."), problem: nil)
+        }
+        return Status(kind: .problem, text: tr("The last backup did not finish (\(when)).", "마지막 백업이 끝나지 못했어요 (\(when))."),
+                      problem: BackupProblem.explain(outcome.reason))
+    }
+
+    private var canBackUp: Bool {
+        !mac.running && !backup.busy && storage.config.place?.connected != false && Helper.missing(main: model.role == .main).isEmpty
+    }
+
+    var body: some View {
+        let status = status
+        VStack(alignment: .leading, spacing: Space.l) {
+            Text(tr("Back Up", "백업"))
+                .font(AppText.largeTitle.weight(.bold))
+                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: Space.s) {
+                if mac.running {
+                    HStack(spacing: Space.m) {
+                        ProgressView().controlSize(.small)
+                        Text(mac.currentStep.map { tr("Backing up: \($0.title)…", "백업하는 중: \($0.title)…") } ?? tr("Starting the backup…", "백업을 시작하는 중…"))
+                            .font(AppText.title3.weight(.semibold))
+                    }
+                } else {
+                    StatusLabel(kind: status.kind, text: status.text)
+                        .font(AppText.title3.weight(.semibold))
+                    if let problem = status.problem { ProblemLine(problem: problem) }
+                }
+                PlaceLine()
+            }
+            MissingHelpersLine()
+            AdaptiveRow {
+                Button {
+                    mac.start(main: model.role == .main, folders: storage.config.files)
+                } label: {
+                    Text(tr("Back Up This Mac", "이 맥 백업하기")).frame(minWidth: 150 * TextScale.current)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canBackUp)
+                .fixedSize()
+            } trailing: {
+                ScheduleLine()
+            }
+        }
+        .frame(maxWidth: Metrics.contentWidth, alignment: .leading)
+        .padding(.horizontal, Space.page)
+        .padding(.top, 26)
+        .padding(.bottom, Space.xs)
+    }
+}
+
+struct ProblemLine: View {
+    @Environment(SetupModel.self) private var model
+    @Environment(BackupModel.self) private var backup
+    @Environment(\.openSettings) private var openSettings
+    @Environment(\.consoleSheet) private var consoleSheet
+    let problem: BackupProblem
 
     var body: some View {
         AdaptiveRow {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Image(systemName: symbol).font(AppText.title3).foregroundStyle(.secondary).frame(width: 28 * TextScale.current).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
+            Text(problem.text)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } trailing: {
+            switch problem.fix {
+            case .install(let tools):
+                Button(tr("Install \(tools.map(\.rawValue).joined(separator: " and "))", "\(tools.map(\.rawValue).joined(separator: ", ")) 설치")) {
+                    backup.install(tools)
+                    consoleSheet.wrappedValue = true
+                }
+                .disabled(backup.busy).fixedSize()
+            case .choosePlace:
+                Button(tr("Choose Place…", "장소 고르기…")) { SettingsTab.open(.place, openSettings) }.fixedSize()
+            case .chooseFolders:
+                Button(tr("Choose Folders…", "폴더 고르기…")) { model.page = .folders }.fixedSize()
+            case .fullDiskAccess:
+                Button(tr("Open Privacy Settings…", "개인정보 설정 열기…")) { BackupModel.openFullDiskAccess() }.fixedSize()
+            case .details, nil:
+                EmptyView()
+            }
+        }
+    }
+}
+
+struct PlaceLine: View {
+    @Environment(StorageModel.self) private var storage
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        if let place = storage.config.place {
+            AdaptiveRow {
+                Text(place.sentence + free)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(storage.config.target)
+            } trailing: {
+                Button(tr("Change…", "바꾸기…")) { SettingsTab.open(.place, openSettings) }
+                    .buttonStyle(.link)
+                    .fixedSize()
+            }
+        }
+    }
+
+    private var free: String {
+        guard let c = storage.capacity, let bytes = c.available, !c.stale else { return "" }
+        let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        return tr(" \(size) free.", " \(size) 남았어요.")
+    }
+}
+
+struct ScheduleLine: View {
+    @Environment(SetupModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: Space.s) {
+            Text(model.backupInstalled.map { tr("Backs up by itself: \($0.summary.lowercasedFirst)", "자동 백업: \($0.summary)") }
+                 ?? tr("Automatic backup is off.", "자동 백업은 꺼져 있어요."))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(model.backupInstalled == nil ? tr("Turn On…", "켜기…") : tr("Change…", "바꾸기…")) { model.page = .schedule }
+                .buttonStyle(.link)
+                .fixedSize()
+        }
+    }
+}
+
+struct MissingHelpersLine: View {
+    @Environment(SetupModel.self) private var model
+    @Environment(BackupModel.self) private var backup
+    @Environment(\.consoleSheet) private var consoleSheet
+
+    var body: some View {
+        let missing = Helper.missing(main: model.role == .main || model.repo == nil)
+        if !missing.isEmpty {
+            AdaptiveRow {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    StatusLabel(kind: .problem, text: tr("First install the free tools LazyMac uses:", "먼저 LazyMac이 쓰는 무료 도구를 설치해 주세요:"))
+                    ForEach(missing) { tool in
+                        Text(verbatim: "• \(tool.rawValue): \(tool.purpose)")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } trailing: {
+                Button(tr("Install Tools", "도구 설치")) {
+                    backup.install(missing)
+                    consoleSheet.wrappedValue = true
+                }
+                .disabled(backup.busy)
+                .fixedSize()
+            }
+        }
+    }
+}
+
+struct RunStepsSection: View {
+    @Environment(MacBackup.self) private var mac
+
+    var body: some View {
+        Section {
+            if mac.running {
+                ProgressView(value: Double(mac.doneCount), total: Double(max(mac.steps.count, 1)))
+                    .accessibilityLabel(tr("Backup progress", "백업 진행"))
+            }
+            ForEach(mac.steps) { step in
+                let state = mac.states[step] ?? .waiting
+                HStack(spacing: Space.l) {
+                    Group {
+                        switch state {
+                        case .waiting: Image(systemName: "circle").foregroundStyle(.tertiary)
+                        case .running: ProgressView().controlSize(.small)
+                        case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        }
+                    }
+                    .frame(width: 18 * TextScale.current)
+                    Text(step.title)
+                        .font(AppText.body.weight(state == .running ? .semibold : .regular))
+                        .foregroundStyle(state == .waiting ? .secondary : .primary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityValue(state == .done ? tr("done", "완료") : state == .failed ? tr("problem", "문제") : state == .running ? tr("running", "진행 중") : tr("waiting", "대기"))
+            }
+        } header: {
+            Text(mac.running ? tr("Backing up", "백업하는 중") : tr("Where it stopped", "멈춘 곳"))
+        }
+    }
+}
+
+struct PartsSection: View {
+    @Environment(SetupModel.self) private var model
+    @Environment(BackupModel.self) private var backup
+    @Environment(StorageModel.self) private var storage
+    @Environment(\.consoleSheet) private var consoleSheet
+    @State private var askLock = false
+    let parts: BackupParts
+
+    private var main: Bool { model.role == .main }
+
+    var body: some View {
+        Section {
+            PartRow(symbol: "square.grid.2x2", title: tr("Apps and tools", "앱과 도구"), lines: appsLines, saved: parts.scannedAt != nil)
+            PartRow(symbol: "slider.horizontal.3", title: tr("Settings", "설정"), lines: [settingsLine], saved: main && parts.settingsAt != nil)
+            passwords
+            folders
+        } header: {
+            Text(tr("What a backup holds", "백업하는 것"))
+        }
+        .alert(tr("Lock your passwords and sign-ins?", "비밀번호와 로그인 정보를 잠글까요?"), isPresented: $askLock) {
+            Button(tr("Cancel", "취소"), role: .cancel) {}
+            Button(tr("Lock Them", "잠그기")) {
+                backup.lockSecrets(startList: true)
+                consoleSheet.wrappedValue = true
+            }
+        } message: {
+            Text(tr("LazyMac locks the usual sign-in files, like SSH keys and GitHub and cloud tool sign-ins, with a passphrase you choose. Keep the passphrase somewhere safe: without it nobody can open them, not even LazyMac.",
+                    "SSH 키, GitHub와 클라우드 도구 로그인 같은 흔한 로그인 파일을 직접 정한 암호로 잠가요. 암호는 안전한 곳에 꼭 적어 두세요. 암호가 없으면 LazyMac도 열 수 없어요."))
+        }
+    }
+
+    private var appsLines: [String] {
+        guard let apps = parts.foundApps, let scanned = parts.scannedAt else {
+            return [tr("Not checked yet. The next backup lists them.", "아직 살펴보지 않았어요. 다음 백업 때 목록을 만들어요.")]
+        }
+        let tools = parts.foundTools ?? 0
+        let found = tr("\(apps) apps and \(tools) tools on this Mac · checked \(dayPhrase(scanned))",
+                       "이 맥의 앱 \(apps)개, 도구 \(tools)개 · \(dayPhrase(scanned)) 확인")
+        let list = parts.listItems > 0
+            ? tr("\(parts.listItems) are on your list to bring to a new Mac.", "새 맥에 가져갈 목록에 \(parts.listItems)개가 있어요.")
+            : tr("Your list for a new Mac is still empty.", "새 맥에 가져갈 목록은 아직 비어 있어요.")
+        return [found, list]
+    }
+
+    private var settingsLine: String {
+        guard main else { return tr("Your main Mac saves these.", "주 맥에서 저장해요.") }
+        guard let saved = parts.settingsAt else { return tr("Saved with the next backup.", "다음 백업 때 저장해요.") }
+        return tr("\(parts.settingsFiles) settings files and \(parts.macSettings) Mac settings · saved \(dayPhrase(saved))",
+                  "설정 파일 \(parts.settingsFiles)개, 맥 설정 \(parts.macSettings)개 · \(dayPhrase(saved)) 저장")
+    }
+
+    @ViewBuilder private var passwords: some View {
+        let title = tr("Passwords and sign-ins", "비밀번호와 로그인")
+        if !main {
+            PartRow(symbol: "key", title: title, lines: [tr("Your main Mac keeps these.", "주 맥에서 보관해요.")], saved: parts.bundleAt != nil)
+        } else if Helper.age.path == nil {
+            PartRow(symbol: "key", title: title, lines: [tr("Needs age, a free tool that \(Helper.age.purpose).", "age가 필요해요. 무료 도구이고, \(Helper.age.purpose).")], saved: false) {
+                Button(tr("Install age", "age 설치")) {
+                    backup.install([.age])
+                    consoleSheet.wrappedValue = true
+                }
+                .disabled(backup.busy)
+            }
+        } else if !parts.hasManifest {
+            PartRow(symbol: "key", title: title, lines: [tr("Not set up yet. Lock your sign-in keys with a passphrase you choose.", "아직 준비 전이에요. 직접 정한 암호로 로그인 키를 잠가 둘 수 있어요.")], saved: false) {
+                Button(tr("Set Up…", "준비하기…")) { askLock = true }.disabled(backup.busy)
+            }
+        } else if let locked = parts.bundleAt {
+            PartRow(symbol: "key", title: title, lines: [tr("Locked with your passphrase · saved \(dayPhrase(locked))", "내 암호로 잠금 · \(dayPhrase(locked)) 저장")], saved: true) {
+                Button(tr("Update…", "다시 잠그기…")) {
+                    backup.lockSecrets(startList: false)
+                    consoleSheet.wrappedValue = true
+                }
+                .disabled(backup.busy)
+            }
+        } else {
+            PartRow(symbol: "key", title: title, lines: [tr("Not locked yet.", "아직 잠그지 않았어요.")], saved: false) {
+                Button(tr("Lock and Save…", "잠가서 저장…")) {
+                    backup.lockSecrets(startList: false)
+                    consoleSheet.wrappedValue = true
+                }
+                .disabled(backup.busy)
+            }
+        }
+    }
+
+    @ViewBuilder private var folders: some View {
+        let on = Binding(get: { storage.config.files }, set: { storage.setFiles($0); if $0 && backup.config.folders.isEmpty { model.page = .folders } })
+        let count = backup.config.folders.count
+        let line: String = !storage.config.files
+            ? tr("Optional. Also copy folders that are not on iCloud or GitHub.", "선택 사항이에요. iCloud나 GitHub에 없는 폴더도 함께 복사해요.")
+            : count == 0 ? tr("On, but no folders are chosen yet.", "켜져 있지만 아직 고른 폴더가 없어요.")
+            : tr(count == 1 ? "1 folder is copied with every backup." : "\(count) folders are copied with every backup.", "백업할 때마다 폴더 \(count)개를 복사해요.")
+        PartRow(symbol: "folder", title: tr("Files and folders", "파일과 폴더"), lines: [line], saved: false, problem: storage.config.files && count == 0) {
+            if storage.config.files {
+                Button(tr("Choose Folders…", "폴더 고르기…")) { model.page = .folders }
+            }
+            Toggle(tr("Copy folders too", "폴더도 복사"), isOn: on)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .accessibilityLabel(tr("Copy folders too", "폴더도 복사"))
+        }
+    }
+}
+
+struct PartRow<Trailing: View>: View {
+    let symbol: String
+    let title: String
+    let lines: [String]
+    let saved: Bool
+    var problem = false
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        AdaptiveRow {
+            HStack(alignment: .firstTextBaseline, spacing: Space.l) {
+                Image(systemName: symbol)
+                    .font(AppText.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28 * TextScale.current)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Space.xxs) {
                     Text(title).font(AppText.headline)
-                    Text(detail).font(AppText.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    ForEach(lines, id: \.self) { line in
+                        Text(line)
+                            .font(AppText.callout)
+                            .foregroundStyle(problem ? .primary : .secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         } trailing: {
-            Button(button, action: action).fixedSize()
+            trailing.fixedSize()
+            if saved {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .accessibilityLabel(tr("Saved", "저장됨"))
+            } else if problem {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityLabel(tr("Needs attention", "확인 필요"))
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Space.xs)
     }
 }
+
+extension PartRow where Trailing == EmptyView {
+    init(symbol: String, title: String, lines: [String], saved: Bool) {
+        self.init(symbol: symbol, title: title, lines: lines, saved: saved, problem: false) { EmptyView() }
+    }
+}
+
+struct DetailsSection: View {
+    @Environment(MacBackup.self) private var mac
+    let last: DailyLog?
+    @State private var open = false
+
+    var body: some View {
+        let lines = mac.running || mac.outcome != nil ? mac.lines : (last?.lastRunLines ?? [])
+        if !lines.isEmpty {
+            Section {
+                DisclosureGroup(tr("Details of the last backup", "마지막 백업 자세히 보기"), isExpanded: $open) {
+                    VStack(alignment: .leading, spacing: Space.s) {
+                        ScrollView {
+                            Text(lines.suffix(300).joined(separator: "\n"))
+                                .font(AppText.callout.monospaced())
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(height: 180)
+                        if let url = last?.url {
+                            Button(tr("Open the Log File", "로그 파일 열기")) { NSWorkspace.shared.open(url) }.fixedSize()
+                        }
+                    }
+                    .padding(.top, Space.s)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - First run
+
+/// Two steps for a Mac that has no backup yet: choose where backups go, then back up.
+struct FirstRunView: View {
+    @Environment(SetupModel.self) private var model
+    @Environment(BackupModel.self) private var backup
+    @Environment(StorageModel.self) private var storage
+    @Environment(MacBackup.self) private var mac
+    @Environment(\.openSettings) private var openSettings
+    @State private var hasBackup = false
+    @State private var working = false
+
+    private var place: StorageConfig.Place? { storage.config.place }
+    private var placeReady: Bool {
+        guard let place else { return false }
+        if place.drive { return backup.rclonePath != nil && backup.remotes.contains(backup.config.remoteName) }
+        return place.connected
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.page) {
+                VStack(alignment: .leading, spacing: Space.s) {
+                    Text(tr("Back up this Mac", "이 맥 백업하기"))
+                        .font(AppText.largeTitle.weight(.bold))
+                        .accessibilityAddTraits(.isHeader)
+                    Text(tr("LazyMac saves the list of your apps, your settings and your sign-ins, so a new Mac can be set up the same way.",
+                            "LazyMac은 앱 목록, 설정, 로그인 정보를 저장해 두었다가 새 맥을 똑같이 꾸며 줘요."))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                FirstRunStep(number: 1, done: placeReady, active: !placeReady, title: tr("Choose where backups go", "백업을 둘 곳 고르기")) {
+                    if let place, placeReady {
+                        StatusLabel(kind: .ok, text: place.sentence)
+                    } else if let place, place.drive {
+                        StatusLabel(kind: .problem, text: tr("Google Drive is not connected yet. Finish the steps in Settings.", "Google 드라이브가 아직 연결되지 않았어요. 설정에서 남은 단계를 마쳐 주세요."))
+                    } else if let place, !place.connected {
+                        StatusLabel(kind: .problem, text: tr("The disk “\(place.disk ?? "")” is not connected. Connect it, or choose another folder.", "“\(place.disk ?? "")” 디스크가 연결되어 있지 않아요. 디스크를 연결하거나 다른 폴더를 골라 주세요."))
+                    } else {
+                        Text(tr("A folder on an external disk is safest: the backup stays safe even if this Mac breaks. Any folder works.",
+                                "외장 디스크의 폴더가 가장 안전해요. 이 맥이 고장 나도 백업은 남으니까요. 어느 폴더든 괜찮아요."))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack(spacing: Space.l) {
+                        if placeReady {
+                            Button(tr("Choose Another Folder…", "다른 폴더 고르기…")) { storage.chooseFolder() }.fixedSize()
+                        } else {
+                            Button(tr("Choose Folder…", "폴더 고르기…")) { storage.chooseFolder() }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                                .keyboardShortcut(.defaultAction)
+                                .fixedSize()
+                        }
+                        Button(place?.drive == true ? tr("Open Google Drive Settings…", "Google 드라이브 설정 열기…") : tr("Use Google Drive Instead…", "Google 드라이브 쓰기…")) {
+                            if place?.drive != true {
+                                storage.config.backend = .gdrive
+                                storage.save()
+                            }
+                            SettingsTab.open(.place, openSettings)
+                        }
+                        .buttonStyle(.link)
+                        .fixedSize()
+                    }
+                }
+                FirstRunStep(number: 2, done: false, active: placeReady, title: tr("Back up now", "지금 백업하기")) {
+                    Text(hasBackup
+                         ? tr("This place already has a LazyMac backup. LazyMac uses its list on this Mac and adds this Mac to it.",
+                              "이 장소에는 이미 LazyMac 백업이 있어요. 그 목록을 이 맥에서 쓰고, 이 맥도 함께 저장해요.")
+                         : tr("LazyMac lists your apps and tools, saves your settings and copies them to the backup place. It takes about a minute.",
+                              "LazyMac이 앱과 도구 목록을 만들고 설정을 저장한 뒤 백업 장소로 복사해요. 1분쯤 걸려요."))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if placeReady { MissingHelpersLine() }
+                    HStack(spacing: Space.l) {
+                        Button(tr("Back Up This Mac", "이 맥 백업하기")) { start() }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .keyboardShortcut(placeReady ? .defaultAction : nil)
+                            .disabled(!placeReady || working || mac.running || !Helper.missing(main: !hasBackup).isEmpty)
+                            .fixedSize()
+                        if working || storage.busy { ProgressView().controlSize(.small) }
+                    }
+                    if let message = storage.message, !storage.initialized, !working {
+                        StatusLabel(kind: .info, text: message)
+                    }
+                }
+            }
+            .frame(maxWidth: Metrics.firstRunWidth, alignment: .leading)
+            .padding(.horizontal, Space.page)
+            .padding(.top, 26)
+            .padding(.bottom, Space.page)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .task(id: storage.config.target) {
+            backup.refresh()
+            hasBackup = await storage.placeHasBackup()
+        }
+    }
+
+    private func start() {
+        working = true
+        Task {
+            defer { working = false }
+            if !storage.config.isInitialized {
+                await storage.initialize(hasBackup ? .restore : .new)
+                guard storage.initialized else { return }
+                model.use(repo: storage.config.dataURL)
+                backup.refresh()
+            }
+            mac.start(main: model.role == .main, folders: storage.config.files)
+        }
+    }
+}
+
+struct FirstRunStep<Content: View>: View {
+    let number: Int
+    let done: Bool
+    let active: Bool
+    let title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.l) {
+            StageBadge(number: number, complete: done, active: active)
+                .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 * TextScale.current }
+            VStack(alignment: .leading, spacing: Space.m) {
+                Text(title)
+                    .font(AppText.title2.weight(.semibold))
+                    .foregroundStyle(active || done ? .primary : .secondary)
+                content
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+// MARK: - Output of tool installs and the passwords bundle
+
+private struct ConsoleSheetKey: EnvironmentKey {
+    static let defaultValue: Binding<Bool> = .constant(false)
+}
+
+extension EnvironmentValues {
+    var consoleSheet: Binding<Bool> {
+        get { self[ConsoleSheetKey.self] }
+        set { self[ConsoleSheetKey.self] = newValue }
+    }
+}
+
+extension View {
+    func consoleSheet() -> some View { modifier(ConsoleSheetHost()) }
+}
+
+private struct ConsoleSheetHost: ViewModifier {
+    @Environment(BackupModel.self) private var backup
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.consoleSheet, $shown)
+            .sheet(isPresented: $shown) {
+                VStack(alignment: .leading, spacing: Space.l) {
+                    Text(backup.console.title.isEmpty ? tr("Output", "출력") : backup.console.title)
+                        .font(AppText.title2.bold())
+                    Text(tr("When it asks for a password or passphrase, type it in the field at the bottom and press Return.",
+                            "암호를 물어보면 아래 칸에 입력하고 Return을 눌러 주세요."))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ConsolePanel(console: backup.console)
+                        .frame(minHeight: 280)
+                    if let message = backup.message, !backup.console.running {
+                        Text(message).fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack {
+                        Spacer()
+                        Button(tr("Stop", "중지")) { backup.console.stop() }
+                            .disabled(!backup.console.running)
+                            .fixedSize()
+                        Button(tr("Done", "완료")) { shown = false }
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(backup.console.running)
+                            .fixedSize()
+                    }
+                }
+                .padding(Space.xxl + Space.xs)
+                .frame(width: 600)
+            }
+    }
+}
+
+extension String {
+    var lowercasedFirst: String { prefix(1).lowercased() + dropFirst() }
+}
+
+func folderCount(_ n: Int) -> String { tr(n == 1 ? "1 folder" : "\(n) folders", "\(n)개") }
 
 struct RunRow: View {
     let title: String
@@ -149,17 +667,18 @@ struct BackupConsole: View {
     @Environment(BackupModel.self) private var backup
 
     var body: some View {
-        if backup.lastJob != nil && (backup.console.running || !backup.console.lines.isEmpty) {
+        if let job = backup.lastJob, [.backup, .check, .listCloud, .restore].contains(job),
+           backup.console.running || !backup.console.lines.isEmpty {
             ConsolePanel(console: backup.console)
                 .frame(height: 240)
-                .padding(.horizontal, 28)
-                .padding(.bottom, 20)
-                .frame(maxWidth: 760)
+                .padding(.horizontal, Space.page)
+                .padding(.bottom, Space.xxl)
+                .frame(maxWidth: Metrics.contentWidth)
         }
     }
 }
 
-/// The newest ~/Library/Logs/lazymac-daily/<date>.log: when the last scheduled run ended and how.
+/// The newest ~/Library/Logs/lazymac-daily/<date>.log: when the last run (scheduled or from the app) ended and how.
 struct DailyLog {
     let url: URL
     let date: Date?
@@ -167,7 +686,6 @@ struct DailyLog {
     let detail: String
 
     static func latest() -> DailyLog? {
-        let dir = URL(fileURLWithPath: ProcessInfo.processInfo.environment["LAZYMAC_DAILY_LOGDIR"] ?? NSHomeDirectory() + "/Library/Logs/lazymac-daily")
         let files = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
             .filter { $0.range(of: #"^\d{4}-\d{2}-\d{2}\.log$"#, options: .regularExpression) != nil }.sorted()
         for name in files.reversed() {
@@ -188,7 +706,9 @@ struct DailyLog {
 // MARK: - Back Up > Folders
 
 struct FoldersView: View {
+    @Environment(SetupModel.self) private var model
     @Environment(BackupModel.self) private var backup
+    @Environment(StorageModel.self) private var storage
     @State private var excludes = ""
 
     var body: some View {
@@ -196,28 +716,32 @@ struct FoldersView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     PageHeader(title: tr("Folders", "폴더"),
-                               subtitle: tr("These folders are copied to the selected storage. Nothing is ever deleted, here or at the destination.",
-                                            "이 폴더들을 선택한 저장소에 복사해요. 여기서도 저장소에서도 아무것도 지우지 않아요."))
+                               subtitle: tr("Optional. Copy folders that are not on iCloud or GitHub, like projects, photos or notes. Nothing is ever deleted, here or in the backup.",
+                                            "선택 사항이에요. 프로젝트, 사진, 메모처럼 iCloud나 GitHub에 없는 폴더를 복사해요. 여기서도 백업에서도 아무것도 지우지 않아요."))
                     Form {
-                        if StorageConfig.load().backend == .gdrive { DestinationSection(restoring: false) }
+                        Section {
+                            Toggle(tr("Copy these folders with every backup", "백업할 때마다 이 폴더도 복사하기"),
+                                   isOn: Binding(get: { storage.config.files }, set: { storage.setFiles($0) }))
+                            PlaceLine()
+                        }
                         Section {
                             if backup.config.folders.isEmpty {
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: Space.xs) {
                                     Text(tr("No folders yet", "아직 폴더가 없어요")).font(AppText.headline)
                                     Text(tr("Add folders that are not on GitHub or iCloud, like project files, photos or notes.",
                                             "GitHub나 iCloud에 없는 폴더를 넣어요. 프로젝트 파일, 사진, 메모 같은 것이요."))
                                         .foregroundStyle(.secondary)
                                 }
-                                .padding(.vertical, 4)
+                                .padding(.vertical, Space.xs)
                             }
                             ForEach(backup.config.folders, id: \.self) { FolderRow(path: $0) }
                         } header: {
-                            Text(tr("Folders to back up", "백업할 폴더"))
+                            Text(tr("Folders to copy", "복사할 폴더"))
                         } footer: {
                             AdaptiveRow {
-                                FooterText(tr("Always skipped: dependencies and build output (node_modules, build, .venv…), caches, .env and key files, and folders that are their own GitHub repo.",
-                                              "늘 빼는 것: 의존성·빌드 결과(node_modules, build, .venv…), 캐시, .env와 키 파일, 자체 GitHub 저장소인 폴더.")
-                                           + (backup.gitleaksPath == nil ? "" : tr(" Files gitleaks flags as secrets are skipped too.", " gitleaks가 비밀값으로 찾은 파일도 빼요.")))
+                                FooterText(tr("Always skipped: dependencies and build output (node_modules, build, .venv…), caches, .env and key files, and folders that are their own GitHub project.",
+                                              "늘 빼는 것: 의존성·빌드 결과(node_modules, build, .venv…), 캐시, .env와 키 파일, 자체 GitHub 프로젝트인 폴더.")
+                                           + (backup.gitleaksPath == nil ? "" : tr(" Files that look like they hold a password are skipped too.", " 비밀번호가 든 것처럼 보이는 파일도 빼요.")))
                             } trailing: {
                                 Button(tr("Add Folder…", "폴더 추가…")) { backup.addFolders() }.fixedSize()
                             }
@@ -241,7 +765,7 @@ struct FoldersView: View {
                     }
                     .formStyle(.grouped)
                     .scrollDisabled(true)
-                    .frame(maxWidth: 760, alignment: .leading)
+                    .frame(maxWidth: Metrics.contentWidth, alignment: .leading)
                     BackupConsole()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -255,7 +779,8 @@ struct FoldersView: View {
             } trailing: {
                 Button(tr("Check", "비교")) { backup.check() }.fixedSize()
                     .disabled(!backup.ready || backup.busy)
-                Button(tr("Back Up Now", "지금 백업")) { backup.backUpNow() }.fixedSize()
+                    .help(tr("Compares every folder with its copy, without copying", "복사하지 않고 폴더와 사본을 비교해요"))
+                Button(tr("Copy Folders Now", "지금 폴더 복사")) { backup.backUpNow() }.fixedSize()
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!backup.ready || backup.busy)
@@ -274,10 +799,10 @@ struct RunRowCompact: View {
     var body: some View {
         if let run {
             StatusLabel(kind: run.ok ? .ok : .problem,
-                        text: (run.ok ? tr("Last backup: ", "마지막 백업: ") : tr("Last backup had problems: ", "마지막 백업에 문제: ")) + run.date.formatted(.relative(presentation: .named).locale(Lang.locale)))
+                        text: (run.ok ? tr("Last copy: ", "마지막 복사: ") : tr("Last copy had problems: ", "마지막 복사에 문제: ")) + run.date.formatted(.relative(presentation: .named).locale(Lang.locale)))
                 .lineLimit(2)
         } else {
-            Text(tr("Not backed up yet", "아직 백업하지 않았어요")).foregroundStyle(.secondary)
+            Text(tr("Not copied yet", "아직 복사하지 않았어요")).foregroundStyle(.secondary)
         }
     }
 }
@@ -287,9 +812,9 @@ struct FolderRow: View {
     let path: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.l) {
             Image(systemName: "folder").foregroundStyle(.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Space.xxs) {
                 Text(URL(fileURLWithPath: path).lastPathComponent).font(AppText.body.weight(.medium))
                 Text(BackupConfig.tilde(path))
                     .font(AppText.callout)
@@ -303,96 +828,21 @@ struct FolderRow: View {
                     StatusLabel(kind: .problem, text: tr("Cannot read: needs Full Disk Access", "읽을 수 없어요: 전체 디스크 접근 필요")).font(AppText.callout)
                 }
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: Space.m)
             Button {
                 backup.remove(path)
             } label: {
                 Image(systemName: "minus.circle")
             }
             .buttonStyle(.borderless)
-            .help(tr("Stop backing up this folder (the stored copy stays)", "이 폴더 백업을 그만해요 (저장소의 사본은 남아요)"))
+            .help(tr("Stop copying this folder (the copy in the backup stays)", "이 폴더 복사를 그만해요 (백업에 있는 사본은 남아요)"))
             .accessibilityLabel(tr("Remove \(URL(fileURLWithPath: path).lastPathComponent)", "\(URL(fileURLWithPath: path).lastPathComponent) 빼기"))
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Space.xxs)
     }
 }
 
-// MARK: - Where the copies go
-
-struct DestinationSection: View {
-    @Environment(BackupModel.self) private var backup
-    let restoring: Bool
-    @State private var editing = false
-    @State private var picked = ""
-    @State private var path = ""
-    @State private var connecting = false
-
-    var body: some View {
-        Section {
-            if backup.rclonePath == nil {
-                AdaptiveRow {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(tr("rclone is needed", "rclone이 필요해요")).font(AppText.headline)
-                        Text(tr("A free, open-source tool that copies files to Google Drive, Dropbox, OneDrive and 70 other clouds.",
-                                "Google 드라이브, Dropbox, OneDrive 등 70여 클라우드에 파일을 복사하는 무료 오픈 소스 도구예요."))
-                            .font(AppText.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    }
-                } trailing: {
-                    Button(tr("Install rclone", "rclone 설치")) { backup.installRclone() }.fixedSize()
-                        .buttonStyle(.borderedProminent)
-                        .disabled(backup.busy)
-                }
-            } else if backup.hasRemote && !editing {
-                LabeledContent(restoring ? tr("Backup is in", "백업이 있는 곳") : tr("Copies go to", "복사하는 곳")) {
-                    HStack(spacing: 8) {
-                        Text(backup.config.remote).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
-                        Button(tr("Change…", "바꾸기…")) { start() }.disabled(backup.busy).fixedSize()
-                    }
-                }
-            } else {
-                if !backup.remotes.isEmpty {
-                    Picker(tr("Cloud", "클라우드"), selection: $picked) {
-                        ForEach(backup.remotes, id: \.self) { Text($0).tag($0) }
-                    }
-                    TextField(tr("Folder in the cloud", "클라우드 안 폴더"), text: $path, prompt: Text(BackupModel.suggestedPath))
-                    HStack {
-                        if editing { Button(tr("Cancel", "취소")) { editing = false } }
-                        Spacer()
-                        Button(tr("Use This Cloud", "이 클라우드 쓰기")) {
-                            backup.setRemote(name: picked, path: path.isEmpty ? BackupModel.suggestedPath : path)
-                            editing = false
-                        }
-                        .disabled(picked.isEmpty)
-                    }
-                }
-                AdaptiveRow {
-                    Text(backup.remotes.isEmpty ? tr("Connect a cloud drive to copy to.", "복사할 클라우드 드라이브를 연결해요.")
-                                                : tr("Or connect another one.", "또는 다른 클라우드를 연결해요."))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } trailing: {
-                    Button(tr("Other Cloud…", "다른 클라우드…")) { backup.openRcloneConfig() }.fixedSize()
-                        .help(tr("Opens Terminal with rclone config, for Dropbox, OneDrive, S3 and others. Come back when it is done.",
-                                 "Dropbox, OneDrive, S3 등은 터미널의 rclone config로 설정해요. 끝나면 돌아와 주세요."))
-                    Button(tr("Connect Google Drive…", "Google 드라이브 연결…")) { connecting = true }.fixedSize()
-                        .buttonStyle(.borderedProminent)
-                }
-                .disabled(backup.busy)
-            }
-        } header: {
-            Text(restoring ? tr("Cloud", "클라우드") : tr("Cloud", "클라우드"))
-        }
-        .sheet(isPresented: $connecting) { ConnectSheet().environment(backup) }
-        .onAppear { if picked.isEmpty { picked = backup.config.remoteName.isEmpty ? (backup.remotes.first ?? "") : backup.config.remoteName } }
-        .onChange(of: backup.remotes) { if picked.isEmpty || !backup.remotes.contains(picked) { picked = backup.remotes.first ?? "" } }
-    }
-
-    private func start() {
-        picked = backup.config.remoteName
-        path = backup.config.remotePath
-        editing = true
-    }
-}
+// MARK: - Google Drive connection (rclone config create)
 
 struct ConnectSheet: View {
     @Environment(BackupModel.self) private var backup
@@ -455,11 +905,12 @@ struct ConnectSheet: View {
     }
 }
 
-// MARK: - Back Up > Schedule (also LazyMac > Settings…)
+// MARK: - Back Up > Schedule (also LazyMac > Settings… > Schedule)
 
 struct ScheduleView: View {
     @Environment(SetupModel.self) private var model
     @Environment(BackupModel.self) private var backup
+    @Environment(StorageModel.self) private var storage
     let inSettings: Bool
 
     var body: some View {
@@ -471,10 +922,6 @@ struct ScheduleView: View {
                                         "이 맥이 스스로 백업하는 때예요. LazyMac을 닫아도 뒤에서 돌아요."))
             }
             Form {
-                if inSettings {
-                    StorageSettingsSection()
-                    StorageStatusSection()
-                }
                 Section {
                     Toggle(tr("Back up automatically", "자동으로 백업하기"), isOn: $model.backupOn)
                     if model.backupOn {
@@ -502,7 +949,7 @@ struct ScheduleView: View {
                         LabeledContent(tr("Runs", "도는 때"), value: model.backupDraft.summary)
                     }
                 } header: {
-                    Text(tr("Auto backup", "자동 백업"))
+                    Text(tr("Automatic backup", "자동 백업"))
                 } footer: {
                     FooterText(whatRuns)
                 }
@@ -514,15 +961,15 @@ struct ScheduleView: View {
                                                              "예약 작업이 가리키는 \(missing)이(가) 없어요. '적용'을 누르면 이 앱으로 다시 맞춰요."))
                     }
                     if model.repo == nil {
-                        Text(tr("Scheduled runs need Full Disk Access for LazyMac, so it can read your folders while you are away.",
-                                "예약 실행이 폴더를 읽으려면 LazyMac에 '전체 디스크 접근'이 필요해요."))
+                        Text(tr("Automatic backups need Full Disk Access for LazyMac, so it can read your folders while you are away.",
+                                "자동 백업이 폴더를 읽으려면 LazyMac에 '전체 디스크 접근'이 필요해요."))
                             .foregroundStyle(.secondary)
                         Button(tr("Open Privacy Settings…", "개인정보 설정 열기…")) { BackupModel.openFullDiskAccess() }.fixedSize()
                     }
                 }
             }
             .formStyle(.grouped)
-            .frame(maxWidth: inSettings ? nil : 760, alignment: .leading)
+            .frame(maxWidth: inSettings ? nil : Metrics.contentWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             BottomBar {
@@ -542,8 +989,11 @@ struct ScheduleView: View {
     }
 
     var whatRuns: String {
-        tr("Each run saves this Mac's inventory to storage. Only the main Mac updates the shared catalog and snapshots. Folder copying and comparison run only when file backup is on.",
-           "돌 때마다 이 맥의 훑은 기록을 저장소에 복사해요. 공유 목록과 스냅샷은 주 맥에서만 바꿔요. 폴더 복사와 비교는 파일 백업을 켰을 때만 돌아요.")
+        storage.config.files
+            ? tr("Each automatic backup lists this Mac's apps, saves your settings, copies your folders and copies everything to your backup place.",
+                 "자동 백업은 이 맥의 앱 목록을 만들고, 설정을 저장하고, 폴더를 복사한 뒤 모두 백업 장소로 복사해요.")
+            : tr("Each automatic backup lists this Mac's apps, saves your settings and copies them to your backup place. Folders are copied only when you turn them on.",
+                 "자동 백업은 이 맥의 앱 목록을 만들고, 설정을 저장한 뒤 백업 장소로 복사해요. 폴더는 켰을 때만 복사해요.")
     }
 }
 
@@ -575,10 +1025,10 @@ struct RestoreFoldersView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     PageHeader(title: tr("Restore Folders", "폴더 복원"),
-                               subtitle: tr("Bring backed-up folders back from storage. Files already on this Mac are kept as they are.",
-                                            "백업한 폴더를 저장소에서 되살려요. 이 맥에 이미 있는 파일은 그대로 둬요."))
+                               subtitle: tr("Bring backed-up folders back. Files already on this Mac are kept as they are.",
+                                            "백업한 폴더를 되살려요. 이 맥에 이미 있는 파일은 그대로 둬요."))
                     Form {
-                        if StorageConfig.load().backend == .gdrive { DestinationSection(restoring: true) }
+                        Section { PlaceLine() }
                         Section {
                             if !backup.cloudListed {
                                 AdaptiveRow {
@@ -590,7 +1040,7 @@ struct RestoreFoldersView: View {
                                 }
                             } else if backup.cloudFolders.isEmpty {
                                 AdaptiveRow {
-                                    StatusLabel(kind: .info, text: tr("No LazyMac backup in \(backup.config.remote).", "\(backup.config.remote)에 LazyMac 백업이 없어요."))
+                                    StatusLabel(kind: .info, text: tr("This backup has no folders.", "이 백업에는 폴더가 없어요."))
                                 } trailing: {
                                     Button(tr("Look Again", "다시 찾기")) { backup.listCloud() }.disabled(backup.busy).fixedSize()
                                 }
@@ -599,7 +1049,7 @@ struct RestoreFoldersView: View {
                                     let on = Binding(get: { backup.restoreSelection.contains(rel) },
                                                      set: { if $0 { backup.restoreSelection.insert(rel) } else { backup.restoreSelection.remove(rel) } })
                                     Toggle(isOn: on) {
-                                        VStack(alignment: .leading, spacing: 2) {
+                                        VStack(alignment: .leading, spacing: Space.xxs) {
                                             Text(URL(fileURLWithPath: rel).lastPathComponent).font(AppText.body.weight(.medium))
                                             Text(tr("To ", "→ ") + BackupConfig.tilde(BackupConfig.localPath(rel, under: backup.restoreTo?.path)))
                                                 .font(AppText.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
@@ -634,7 +1084,7 @@ struct RestoreFoldersView: View {
                     }
                     .formStyle(.grouped)
                     .scrollDisabled(true)
-                    .frame(maxWidth: 760, alignment: .leading)
+                    .frame(maxWidth: Metrics.contentWidth, alignment: .leading)
                     BackupConsole()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

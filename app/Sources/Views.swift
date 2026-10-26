@@ -17,6 +17,22 @@ enum TextScale {
     }
 }
 
+enum Space {
+    static let xxs: CGFloat = 2
+    static let xs: CGFloat = 4
+    static let s: CGFloat = 6
+    static let m: CGFloat = 8
+    static let l: CGFloat = 12
+    static let xl: CGFloat = 16
+    static let xxl: CGFloat = 20
+    static let page: CGFloat = 28
+}
+
+enum Metrics {
+    static let contentWidth: CGFloat = 760
+    static let firstRunWidth: CGFloat = 640
+}
+
 enum AppText {
     static func size(_ style: Font.TextStyle) -> CGFloat {
         switch style {
@@ -73,23 +89,24 @@ struct TextSizeCommands: Commands {
 }
 
 enum Page: String, CaseIterable, Identifiable {
-    case overview, folders, schedule, restoreFolders, apps
+    case overview, folders, schedule, apps, restoreFolders
     var id: String { rawValue }
 
     var isBackup: Bool { self == .overview || self == .folders || self == .schedule }
 
     var title: String {
         switch self {
-        case .overview: tr("Overview", "한눈에")
+        case .overview: tr("This Mac", "이 맥")
         case .folders: tr("Folders", "폴더")
         case .schedule: tr("Schedule", "일정")
-        case .restoreFolders: tr("Folders", "폴더")
         case .apps: tr("Apps and Settings", "앱과 설정")
+        case .restoreFolders: tr("Folders", "폴더")
         }
     }
 
     var accessibilityTitle: String {
         switch self {
+        case .overview: tr("Back up this Mac", "이 맥 백업")
         case .folders: tr("Back up folders", "폴더 백업")
         case .restoreFolders: tr("Restore folders", "폴더 복원")
         default: title
@@ -98,11 +115,11 @@ enum Page: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .overview: "gauge.with.dots.needle.33percent"
+        case .overview: "laptopcomputer"
         case .folders: "folder"
         case .schedule: "calendar.badge.clock"
-        case .restoreFolders: "arrow.down.doc"
         case .apps: "macbook.and.iphone"
+        case .restoreFolders: "arrow.down.doc"
         }
     }
 
@@ -112,6 +129,8 @@ enum Page: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @Environment(SetupModel.self) private var model
     @Environment(BackupModel.self) private var backup
+    @Environment(StorageModel.self) private var storage
+    @Environment(MacBackup.self) private var mac
     @Environment(\.openSettings) private var openSettings
     @AppStorage(TextScale.key) private var scale = 1.0
 
@@ -125,6 +144,7 @@ struct ContentView: View {
                 if env["LAZYMAC_SHOW"] == "settings" { openSettings() }
                 switch env["LAZYMAC_DO"] {
                 case "backup": backup.backUpNow()
+                case "mac-backup": mac.start(main: model.role == .main, folders: storage.config.files)
                 case "check": backup.check()
                 case "find": backup.listCloud()
                 default: break
@@ -142,8 +162,8 @@ struct ContentView: View {
                 case .overview: OverviewView()
                 case .folders: FoldersView()
                 case .schedule: ScheduleView(inSettings: false)
-                case .restoreFolders: RestoreFoldersView()
                 case .apps: AppsView()
+                case .restoreFolders: RestoreFoldersView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -155,7 +175,12 @@ struct ContentView: View {
 
 struct NavList: View {
     @Environment(SetupModel.self) private var model
+    @Environment(BackupModel.self) private var backup
     @Environment(\.openWindow) private var openWindow
+
+    private var restorePages: [Page] {
+        backup.backupHasFolders || model.page == .restoreFolders ? [.apps, .restoreFolders] : [.apps]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -170,19 +195,11 @@ struct NavList: View {
             NavHeader(title: tr("Back Up", "백업"))
             ForEach(Page.allCases.filter(\.isBackup)) { NavRow(page: $0) }
             NavHeader(title: tr("Restore", "복원")).padding(.top, 14)
-            ForEach(Page.allCases.filter { !$0.isBackup }) { NavRow(page: $0) }
+            ForEach(restorePages) { NavRow(page: $0) }
 
             Spacer(minLength: 16)
 
             VStack(alignment: .leading, spacing: 6) {
-                if let repo = model.repo {
-                    Label(BackupConfig.tilde(repo.path), systemImage: "folder")
-                        .font(AppText.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(repo.path)
-                }
                 Button(tr("Manage App Sources…", "앱 출처 관리…")) { openWindow(id: "sources") }
                     .buttonStyle(.link)
                     .multilineTextAlignment(.leading)
@@ -427,13 +444,13 @@ struct PrepareView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     PageHeader(title: tr("Restore apps and settings", "앱과 설정 복원"),
-                               subtitle: tr("Installs only what you pick from your data folder: apps, tools, settings and sign-ins.",
-                                            "데이터 폴더 목록에서 고른 앱, 도구, 설정, 로그인만 설치해요."))
+                               subtitle: tr("Installs only what you pick from your backup list: apps, tools, settings and sign-ins.",
+                                            "백업 목록에서 고른 앱, 도구, 설정, 로그인만 설치해요."))
                     Form {
                         Section {
                             CheckRow(symbol: "shippingbox", title: "Homebrew",
-                                     detail: tr("The package manager for macOS. Most apps and tools are installed with it.",
-                                                "맥용 패키지 관리자예요. 앱과 도구 대부분을 이걸로 설치해요."),
+                                     detail: tr("A free installer for macOS that LazyMac uses to install your apps and tools.",
+                                                "LazyMac이 앱과 도구를 설치할 때 쓰는 맥용 무료 설치 프로그램이에요."),
                                      done: model.brewPath != nil, enabled: true,
                                      action: (tr("Install", "설치"), model.installHomebrew))
                             RepoRow()
@@ -459,7 +476,7 @@ struct PrepareView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             BottomBar {
-                Text(model.ready ? tr("Ready", "준비됐어요") : tr("Restore or initialize your data folder first", "먼저 데이터 폴더를 복원하거나 시작해 주세요"))
+                Text(model.ready ? tr("Ready to choose what to install.", "설치할 항목을 고를 준비가 됐어요.") : tr("Set up your backup place first.", "먼저 백업 장소를 준비해 주세요."))
                     .foregroundStyle(.secondary)
             } trailing: {
                 Button(tr("Choose Items", "항목 고르기")) { model.stage = .choose }.fixedSize()
@@ -473,21 +490,33 @@ struct PrepareView: View {
 
 struct RepoRow: View {
     @Environment(SetupModel.self) private var model
+    @Environment(StorageModel.self) private var storage
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        if model.ready, let repo = model.repo {
-            CheckRow(symbol: "folder", title: tr("LazyMac data", "LazyMac 데이터"),
-                     detail: tr("In \(BackupConfig.tilde(repo.path)) · \(itemCount(model.selectableRows.count))",
-                                "\(BackupConfig.tilde(repo.path))에 있어요 · \(model.selectableRows.count)개 항목"),
-                     done: true, enabled: true, action: ("", {}),
-                     secondary: (tr("Choose Another…", "다른 폴더…"), model.chooseRepo))
+        if model.ready {
+            CheckRow(symbol: "list.bullet.rectangle", title: tr("Your backup list", "백업 목록"),
+                     detail: tr("\(itemCount(model.selectableRows.count)) ready to choose from.",
+                                "고를 수 있는 항목이 \(model.selectableRows.count)개 있어요."),
+                     done: true, enabled: true, action: ("", {}))
+        } else if storage.config.hasPlace {
+            CheckRow(symbol: "list.bullet.rectangle", title: tr("Your backup list", "백업 목록"),
+                     detail: tr("Get the list from your backup place, or back up this Mac first.",
+                                "백업 장소에서 목록을 가져오거나, 먼저 이 맥을 백업해 주세요."),
+                     done: false, enabled: !storage.busy,
+                     action: (tr("Get List from Backup", "백업에서 목록 가져오기"), {
+                         Task {
+                             await storage.initialize(.restore)
+                             if storage.config.isInitialized { model.use(repo: storage.config.dataURL) }
+                         }
+                     }),
+                     secondary: (tr("Back Up First", "먼저 백업하기"), { model.page = .overview }))
         } else {
-            CheckRow(symbol: "folder", title: tr("LazyMac data", "LazyMac 데이터"),
-                     detail: tr("Open Settings to restore from storage or start from example data. Already moved your data? Choose its folder.",
-                                "설정에서 저장소를 복원하거나 예제로 시작해요. 데이터를 옮겼다면 그 폴더를 골라 주세요."),
+            CheckRow(symbol: "list.bullet.rectangle", title: tr("Your backup list", "백업 목록"),
+                     detail: tr("Choose where your backup is stored so LazyMac can load your list.",
+                                "LazyMac이 목록을 불러올 수 있게 백업이 있는 장소를 골라 주세요."),
                      done: false, enabled: true,
-                     action: (tr("Open Settings…", "설정 열기…"), { openSettings() }),
+                     action: (tr("Choose Backup Place…", "백업 장소 고르기…"), { SettingsTab.open(.place, openSettings) }),
                      secondary: (tr("Choose Folder…", "폴더 고르기…"), model.chooseRepo))
         }
     }
@@ -559,7 +588,11 @@ struct ChooseView: View {
                     }
                 }
                 if model.groups.isEmpty {
-                    Text(tr("Nothing matches “\(model.search)”", "“\(model.search)”에 맞는 항목이 없어요")).foregroundStyle(.secondary)
+                    Text(model.search.isEmpty
+                         ? tr("Your list has no items yet. Back up this Mac first, or add items in Manage App Sources.",
+                              "아직 목록에 항목이 없어요. 먼저 이 맥을 백업하거나 ‘앱 출처 관리’에서 항목을 추가해 주세요.")
+                         : tr("Nothing matches “\(model.search)”", "“\(model.search)”에 맞는 항목이 없어요"))
+                        .foregroundStyle(.secondary)
                 }
             }
             .listStyle(.inset)

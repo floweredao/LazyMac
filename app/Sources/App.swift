@@ -13,9 +13,9 @@ enum Main {
             } else { print("{}") }
             return
         }
-        if let mode = value(args, "--storage-init"), ["example", "restore"].contains(mode) {
+        if let raw = value(args, "--storage-init"), let mode = StorageModel.Start(rawValue: raw) {
             let model = StorageModel()
-            await model.initialize(restore: mode == "restore")
+            await model.initialize(mode)
             if let message = model.message { print(message) }
             exit(model.initialized ? 0 : 1)
         }
@@ -139,6 +139,7 @@ struct LazymacApp: App {
     @State private var backup = BackupModel()
     @State private var sources = SourcesModel()
     @State private var storage = StorageModel()
+    @State private var mac = MacBackup()
 
     var body: some Scene {
         Window("LazyMac", id: "main") {
@@ -146,6 +147,7 @@ struct LazymacApp: App {
                 .environment(model)
                 .environment(backup)
                 .environment(storage)
+                .environment(mac)
                 .frame(minWidth: 760, minHeight: 540)
                 .onAppear { backup.repo = { [model] in model.repo } }
         }
@@ -161,11 +163,11 @@ struct LazymacApp: App {
         .defaultSize(width: 1000, height: 720)
 
         Settings {
-            ScheduleView(inSettings: true)
+            SettingsView()
                 .environment(model)
                 .environment(backup)
                 .environment(storage)
-                .frame(width: 620, height: 760)
+                .environment(mac)
         }
     }
 }

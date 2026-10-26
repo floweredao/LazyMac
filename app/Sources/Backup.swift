@@ -109,10 +109,19 @@ struct BackupRun: Identifiable, Equatable {
 enum Tools {
     static var appBin: URL { BackupConfig.supportDir.appendingPathComponent("bin") }
 
+    /// Where the scripts look for tools. LAZYMAC_TOOLS_PATH (a PATH-style list) replaces it, so tests and
+    /// screenshots can show a Mac without a tool.
+    static var searchDirs: [String] {
+        if let p = ProcessInfo.processInfo.environment["LAZYMAC_TOOLS_PATH"] {
+            return p.split(separator: ":").map(String.init)
+        }
+        let home = NSHomeDirectory()
+        return ["/opt/homebrew/bin", "/usr/local/bin", appBin.path, home + "/.bun/bin", home + "/.local/bin"]
+    }
+
     static func find(_ name: String) -> String? {
         let fm = FileManager.default
-        return ["/opt/homebrew/bin/\(name)", "/usr/local/bin/\(name)", appBin.appendingPathComponent(name).path]
-            .first { fm.isExecutableFile(atPath: $0) }
+        return searchDirs.map { $0 + "/" + name }.first { fm.isExecutableFile(atPath: $0) }
     }
 
     /// The folder backup script: LAZYMAC_BACKUP_SCRIPT, then the repo's copy (what the scheduled job runs), then
@@ -133,7 +142,7 @@ enum Tools {
 
 @MainActor @Observable
 final class BackupModel {
-    enum Job: Equatable { case installRclone, connect, backup, check, listCloud, restore }
+    enum Job: Equatable { case installRclone, installTools, connect, backup, check, listCloud, restore, secrets }
 
     private(set) var config = BackupConfig.load()
     private(set) var configured = BackupConfig.exists
@@ -148,6 +157,8 @@ final class BackupModel {
 
     private(set) var cloudFolders: [String] = []
     private(set) var cloudListed = false
+    /// The backup place holds folders (its lazymac-folders.txt), or this Mac backs up folders now.
+    private(set) var backupHasFolders = false
     var restoreSelection: Set<String> = []
     var restoreTo: URL?
     var restoreReplace = false
@@ -178,14 +189,33 @@ final class BackupModel {
         gitleaksPath = Tools.find("gitleaks")
         runs = BackupRun.all()
         checkAccess()
-        Task { await loadRemotes() }
+        Task {
+            await loadRemotes()
+            await probeFolders()
+        }
     }
 
+    /// rclone is asked only when Google Drive is the backup place.
     func loadRemotes() async {
-        guard let rclone = rclonePath else { remotes = []; return }
+        guard StorageConfig.load().backend == .gdrive, let rclone = rclonePath else { remotes = []; return }
         let r = await Shell.run([rclone, "listremotes"])
         remotes = r.out.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }.map { $0.hasSuffix(":") ? String($0.dropLast()) : $0 }
+    }
+
+    func probeFolders() async {
+        let storage = StorageConfig.load()
+        if storage.files && !config.folders.isEmpty { backupHasFolders = true; return }
+        let local = StorageConfig.exists ? storage.backend == .local : false
+        guard hasRemote else { backupHasFolders = false; return }
+        if local {
+            backupHasFolders = FileManager.default.fileExists(atPath: config.remote + "/lazymac-folders.txt")
+        } else if let rclone = rclonePath {
+            let r = await Shell.run([rclone, "lsf", config.remote + "/lazymac-folders.txt"])
+            backupHasFolders = r.code == 0 && !r.out.isEmpty
+        } else {
+            backupHasFolders = false
+        }
     }
 
     /// Folders the app cannot read (missing, or blocked until LazyMac gets Full Disk Access).
@@ -319,6 +349,59 @@ final class BackupModel {
         NSWorkspace.shared.open(file)
     }
 
+    /// Installs missing helper tools in the output panel: gitleaks and age with Homebrew (installed first when
+    /// it is missing; it asks for the Mac password there), bun with its own installer.
+    func install(_ helpers: [Helper]) {
+        let brewTools = helpers.filter { $0 != .bun }.map(\.rawValue)
+        var script = "set -e\n"
+        if !brewTools.isEmpty {
+            script += """
+            if ! command -v brew >/dev/null 2>&1; then
+              echo "Installing Homebrew first. It asks for your Mac password."
+              /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+              eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+            fi
+            brew install \(brewTools.joined(separator: " "))
+
+            """
+        }
+        if helpers.contains(.bun) { script += "curl -fsSL https://bun.sh/install | bash\n" }
+        start(.installTools, tr("Install tools", "도구 설치"), ["/bin/zsh", "-c", script]) { [weak self] _ in self?.refresh() }
+    }
+
+    static let starterManifest = """
+    # What bin/secrets-pack.sh locks into secrets.tar.age with your passphrase. Paths are inside your home
+    # folder; a line that matches nothing on this Mac is skipped. Add keychain:<service> lines for Keychain items.
+    .ssh/id_*
+    .config/gh/hosts.yml
+    .aws/credentials
+    .docker/config.json
+    .netrc
+    .npmrc
+    .kube/config
+
+    """
+
+    /// Locks the passwords and sign-in files into the encrypted bundle. age asks for the passphrase in the
+    /// output panel. With `startList`, first writes a starter list of the usual sign-in files.
+    func lockSecrets(startList: Bool) {
+        guard let script = Tools.script("secrets-pack.sh") else { return }
+        let manifest = StorageConfig.load().dataURL.appendingPathComponent("secrets/manifest.txt")
+        if startList, !FileManager.default.fileExists(atPath: manifest.path) {
+            do {
+                try FileManager.default.createDirectory(at: manifest.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Self.starterManifest.write(to: manifest, atomically: true, encoding: .utf8)
+            } catch {
+                message = error.localizedDescription
+                return
+            }
+        }
+        start(.secrets, tr("Lock passwords and sign-ins", "비밀번호와 로그인 정보 잠그기"), ["/bin/zsh", script]) { [weak self] code in
+            self?.message = code == 0 ? tr("Locked and saved your passwords and sign-ins.", "비밀번호와 로그인 정보를 잠가서 저장했어요.")
+                : tr("Your passwords and sign-ins were not locked. The output says why.", "비밀번호와 로그인 정보를 잠그지 못했어요. 아래 출력에서 이유를 볼 수 있어요.")
+        }
+    }
+
     private func script(_ args: [String], _ job: Job, _ title: String, done: ((Int32) -> Void)? = nil) {
         guard let path = scriptPath else {
             message = tr("The folder backup script is missing from this copy of LazyMac.", "이 LazyMac에 폴더 백업 스크립트가 없어요.")
@@ -334,9 +417,9 @@ final class BackupModel {
             message = tr("The scheduled backup is running now. Try again when it is done.", "예약된 백업이 지금 도는 중이에요. 끝나면 다시 눌러 주세요.")
             return
         }
-        script(["rclone"], .backup, tr("Back up folders", "폴더 백업")) { [weak self] code in
-            self?.message = code == 0 ? tr("Backed up every folder.", "모든 폴더를 백업했어요.")
-                : tr("Some folders were not backed up. The output says which.", "일부 폴더를 백업하지 못했어요. 아래 출력에서 어떤 폴더인지 볼 수 있어요.")
+        script(["rclone"], .backup, tr("Copy folders", "폴더 복사")) { [weak self] code in
+            self?.message = code == 0 ? tr("Copied every folder.", "모든 폴더를 복사했어요.")
+                : tr("Some folders were not copied. The output says which.", "일부 폴더를 복사하지 못했어요. 아래 출력에서 어떤 폴더인지 볼 수 있어요.")
         }
     }
 

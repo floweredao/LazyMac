@@ -33,8 +33,8 @@ enum Step: String, CaseIterable, Identifiable {
         case .scripts: tr("Install-script tools", "설치 스크립트 도구")
         case .releases: tr("GitHub release apps", "GitHub 릴리즈 앱")
         case .dotfiles: tr("Settings files", "설정 파일")
-        case .secrets: tr("Secrets and sign-in files", "비밀값·로그인 파일")
-        case .repos: tr("Repos", "저장소")
+        case .secrets: tr("Passwords and sign-in files", "비밀번호·로그인 파일")
+        case .repos: tr("Other projects", "다른 프로젝트")
         case .jobs: tr("Background jobs", "백그라운드 작업")
         case .downloads: tr("Download-only apps", "직접 받는 앱")
         case .check: tr("Check what is left", "남은 것 확인")
@@ -49,13 +49,13 @@ enum Step: String, CaseIterable, Identifiable {
         case .bun: tr("Installs bun and its global tools", "bun과 bun 전역 도구를 설치해요")
         case .python: tr("Installs Python with uv", "uv로 Python을 설치해요")
         case .scripts: tr("Tools that ship their own install script", "자체 설치 스크립트가 있는 도구")
-        case .releases: tr("Installs apps from the latest GitHub release of their repo",
-                           "저장소의 최신 GitHub 릴리즈에서 앱을 받아 설치해요")
+        case .releases: tr("Installs apps from their latest GitHub release",
+                           "최신 GitHub 릴리즈에서 앱을 받아 설치해요")
         case .dotfiles: tr("Copies shell, Git, tmux, npm and SSH settings (old files are backed up) and applies the Dock settings",
                            "셸·Git·tmux·npm·SSH 설정을 복사하고 (기존 파일은 백업) Dock 설정을 적용해요")
         case .secrets: tr("Restores sign-ins and API keys from the encrypted bundle (one passphrase)",
                           "암호화 묶음에서 로그인 정보와 API 키를 되살려요 (암호 한 번)")
-        case .repos: tr("Gets and installs the other repos your list names", "목록에 적힌 다른 저장소를 받아 설치해요")
+        case .repos: tr("Gets and sets up the other projects your list names", "목록에 적힌 다른 프로젝트를 받아 준비해요")
         case .jobs: tr("Registers the background jobs you picked", "고른 백그라운드 작업을 등록해요")
         case .downloads: tr("Opens the download page of apps that have no Homebrew package",
                             "Homebrew에 없는 앱의 다운로드 페이지를 열어요")
@@ -153,8 +153,8 @@ enum Catalog {
         for (i, (lineIndex, line)) in lines.dropFirst().enumerated() {
             let c = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
             guard c.count == 12 else {
-                throw CatalogError(message: tr("catalog.tsv item \(i + 1): expected 12 columns, got \(c.count)",
-                                               "catalog.tsv \(i + 1)번째 항목: 열이 12개여야 하는데 \(c.count)개예요"))
+                throw CatalogError(message: tr("Your app list item \(i + 1): expected 12 columns, got \(c.count)",
+                                               "앱 목록 \(i + 1)번째 항목: 열이 12개여야 하는데 \(c.count)개예요"))
             }
             guard let decision = Decision(rawValue: c[5]) else {
                 throw CatalogError(message: tr("catalog.tsv item \(i + 1): unknown decision \(c[5])",

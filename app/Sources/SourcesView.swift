@@ -57,8 +57,8 @@ struct SourcesView: View {
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(!sources.canSync)
-                    .help(tr("Saves catalog.tsv, updates setup files, then copies data to storage. Only the main Mac can edit shared data.",
-                             "catalog.tsv와 설치 목록을 저장한 뒤 저장소에 복사해요. 공유 데이터는 주 맥에서만 고칠 수 있어요."))
+                    .help(tr("Saves your list, updates the setup files, then copies them to your backup place. Only the main Mac can edit the shared list.",
+                             "목록과 설치 파일을 저장한 뒤 백업 장소로 복사해요. 공유 목록은 주 맥에서만 고칠 수 있어요."))
             }
         }
         .frame(minWidth: 880, minHeight: 560)

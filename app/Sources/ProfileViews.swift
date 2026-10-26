@@ -140,8 +140,8 @@ struct CompareSheet: View {
                 }
                 .listStyle(.inset)
                 .frame(minHeight: 260)
-                Text(tr("\(c.notChecked) picked items cannot be seen by a scan (settings, secrets, repos). \(c.unlisted) things on this Mac are not in the catalog yet.",
-                        "고른 것 중 \(c.notChecked)개는 훑기로 볼 수 없어요 (설정·비밀값·저장소). 이 맥에 있지만 목록에 아직 없는 것이 \(c.unlisted)개 있어요."))
+                Text(tr("\(c.notChecked) picked items cannot be seen by a scan (settings, sign-ins, other projects). \(c.unlisted) things on this Mac are not in your list yet.",
+                        "고른 것 중 \(c.notChecked)개는 훑기로 볼 수 없어요 (설정·로그인·다른 프로젝트). 이 맥에 있지만 목록에 아직 없는 것이 \(c.unlisted)개 있어요."))
                     .font(AppText.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
