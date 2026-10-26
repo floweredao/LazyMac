@@ -8,7 +8,8 @@
 
 </div>
 
-LazyMac has one goal: set up your next Mac with the same apps and tools as this one, installed fresh.
+LazyMac has one goal: set up your next Mac with the same apps and tools as this one, installed fresh.\
+Backing up project folders and other files on this Mac is optional, and stays off until you turn it on.
 
 It keeps a list of the apps, tools, settings, and sign-ins on this Mac and backs it up to Google Drive.\
 On the new Mac, it installs fresh copies of what is on that list.\
