@@ -155,6 +155,17 @@ struct LazymacApp: App {
         .windowToolbarStyle(.unified)
         .commands { TextSizeCommands() }
 
+        Window(tr("Welcome to LazyMac", "LazyMac 시작하기"), id: Onboarding.windowID) {
+            OnboardingView()
+                .environment(model)
+                .environment(backup)
+                .environment(storage)
+                .environment(mac)
+                .onAppear { backup.repo = { [model] in model.repo } }
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+
         Window(tr("App Sources", "앱 출처"), id: "sources") {
             SourcesView()
                 .environment(model)

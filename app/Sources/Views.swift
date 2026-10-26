@@ -132,6 +132,8 @@ struct ContentView: View {
     @Environment(StorageModel.self) private var storage
     @Environment(MacBackup.self) private var mac
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @AppStorage(TextScale.key) private var scale = 1.0
 
     var body: some View {
@@ -141,6 +143,14 @@ struct ContentView: View {
             .id(scale)
             .onAppear {
                 let env = ProcessInfo.processInfo.environment
+                if !Onboarding.routed {
+                    Onboarding.routed = true
+                    if Onboarding.shouldShow(initialized: storage.config.isInitialized) {
+                        openWindow(id: Onboarding.windowID)
+                        dismissWindow(id: "main")
+                        return
+                    }
+                }
                 if env["LAZYMAC_SHOW"] == "settings" { openSettings() }
                 switch env["LAZYMAC_DO"] {
                 case "backup": backup.backUpNow()
