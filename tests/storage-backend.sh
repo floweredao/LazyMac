@@ -87,6 +87,10 @@ zsh "$REPO/bin/storage.sh" upload
 LAZYMAC_DATA=$TMP/cloud-restored LAZYMAC_HOST=Fresh-Mac zsh "$REPO/bin/storage.sh" download
 check "rclone data copy and restore share the same data layout" \
   'cmp "$LAZYMAC_DATA/catalog.tsv" "$TMP/cloud-restored/catalog.tsv" && [[ -f "$TMP/cloud-restored/inventory/Example-Mac/marker" ]]'
+printf 'newer scan\n' > "$LAZYMAC_DATA/inventory/Example-Mac/marker"
+zsh "$REPO/bin/storage.sh" download 2> "$TMP/out"
+check "rclone download keeps this Mac's own scan" \
+  '[[ $(<"$LAZYMAC_DATA/inventory/Example-Mac/marker") == "newer scan" ]] && ! grep -q indeterminate "$TMP/out"'
 mkdir -p "$HOME/.bun/bin"
 ln -s "$(command -v bun)" "$HOME/.bun/bin/bun"
 daily

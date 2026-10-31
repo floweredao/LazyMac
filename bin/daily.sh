@@ -105,7 +105,7 @@ elif [[ $BACKEND == local && -d $STORAGE_TARGET/inventory ]]; then
   mkdir -p "$DATA/inventory"
   rsync -a --checksum --exclude="/$STORAGE_HOST/***" "$STORAGE_TARGET/inventory/" "$DATA/inventory/" || fail "Could not refresh inventories"
 elif [[ $BACKEND == gdrive ]]; then
-  rclone copy --exclude "/inventory/$STORAGE_HOST/**" --include '/inventory/**' --exclude '*' \
+  rclone copy --filter "- /inventory/$STORAGE_HOST/**" --filter '+ /inventory/**' --filter '- *' \
     "$STORAGE_TARGET" "$DATA" || fail "Could not refresh inventories"
 fi
 [[ -f $DATA/catalog.tsv ]] || fail "Initialize the data folder in LazyMac first"

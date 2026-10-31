@@ -117,9 +117,10 @@ storage_data() {
         rsync -a --checksum --exclude="/inventory/$STORAGE_HOST/***" "$STORAGE_TARGET/$entry" "$DATA/" || rc=1
       done
     else
-      local -a filters
-      for entry in $shared inventory; do filters+=(--include "/$entry" --include "/$entry/**"); done
-      rclone copy --exclude "/inventory/$STORAGE_HOST/**" "${filters[@]}" --exclude '*' "$STORAGE_TARGET" "$DATA" || rc=1
+      # --filter keeps the rules in this order; mixing --include and --exclude does not.
+      local -a filters=(--filter "- /inventory/$STORAGE_HOST/**")
+      for entry in $shared inventory; do filters+=(--filter "+ /$entry" --filter "+ /$entry/**"); done
+      rclone copy "${filters[@]}" --filter '- *' "$STORAGE_TARGET" "$DATA" || rc=1
     fi
   fi
   return $rc
