@@ -1,0 +1,46 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scripts:
+    name: test scripts (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The official installer puts bun at ~/.bun/bin, which is where the scripts look for it.
+      - name: Install bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+
+      # The scripts put /opt/homebrew/bin on PATH themselves, so Homebrew is where these belong.
+      # rclone: the backup, restore and capacity tests. gitleaks: the secret checks in settings.sh,
+      # nogit-backup.sh and daily.sh. age: the encrypted secrets bundle. A runner has none of them.
+      - name: Install rclone, gitleaks and age
+        run: brew install --quiet rclone gitleaks age
+
+      - name: Show the tools the tests use
+        run: |
+          sw_vers
+          for t in zsh swift bun jq plutil defaults security rclone gitleaks age sandbox-exec; do
+            printf '%-12s %s\n' "$t" "$(command -v "$t" || echo MISSING)"
+          done
+          swift --version
+
+      # Every script under tests/, so a new one is picked up without editing this file. Each is its
+      # own group, a failure is annotated, and the job keeps going so one run shows every break.
+      - name: Run the test scripts
+        run: |
+          status=0
+          for t in tests/*.sh; do
+            echo "::group::$t"
+            zsh "$t" || { status=1; echo "::error::$t failed"; }
+            echo "::endgroup::"
+          done
+          exit $status
