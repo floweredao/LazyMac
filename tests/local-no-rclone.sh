@@ -11,6 +11,11 @@ TMP=$(mktemp -d "$REPO/.work/no-rclone.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 source "$REPO/tests/fixtures.zsh"
 command -v sandbox-exec >/dev/null || { print "FAIL    sandbox-exec is missing, so rclone cannot be blocked"; exit 1; }
+# Named here, not at the assignment further down: under set -e an assignment takes the status of its
+# last command substitution, so a missing tool would end the script before any check printed.
+for t in bun gitleaks; do
+  command -v $t >/dev/null || { print "FAIL    $t is missing, so this test cannot run"; exit 1; }
+done
 cd "$REPO/app"
 swift build -q
 BIN=$(swift build --show-bin-path)/lazymac
