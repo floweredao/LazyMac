@@ -16,20 +16,20 @@ mkdir -p "$LAZYMAC_OMO_AGENT"
 print -r -- '{"providers":{"other":{"api":"openai-completions"}}}' > "$LAZYMAC_OMO_AGENT/models.json"
 print -r -- '{"other":{"type":"api_key","key":"keep-me"}}' > "$LAZYMAC_OMO_AGENT/auth.json"
 chmod 600 "$LAZYMAC_OMO_AGENT/auth.json"
-K1=sk-ant-usr-FAKEFLOWEREDAOKEY0000000000000000 K2=sk-ant-usr-FAKEMAINKEY00000000000000000000
+K1=sk-ant-usr-FAKEEXAMPLEKEY0000000000000000 K2=sk-ant-usr-FAKEMAINKEY00000000000000000000
 
 check "sync with no keys fails"   '! tool sync >/dev/null 2>&1'
 bad=$(print -rn -- not-a-key | tool add main 2>&1 || true)
 check "bad key is refused"        '[[ $bad == *"Nothing was stored"* && -z $(tool list) ]]'
-out=$(print -rn -- "$K1" | tool add floweredao; print -rn -- "$K2" | tool add main)
+out=$(print -rn -- "$K1" | tool add example; print -rn -- "$K2" | tool add main)
 check "output never shows a key"  '[[ $out != *FAKE* ]]'
-check "list puts main first"      '[[ $(tool list) == $'"'"'main\nfloweredao'"'"' ]]'
+check "list puts main first"      '[[ $(tool list) == $'"'"'main\nexample'"'"' ]]'
 
 m=$LAZYMAC_OMO_AGENT/models.json a=$LAZYMAC_OMO_AGENT/auth.json
 q() { bun -e "const j=JSON.parse(require('fs').readFileSync('$1','utf8')); console.log($2)"; }
 check "provider added, others kept" '[[ $(q $m "Object.keys(j.providers).join()") == other,anthropic-api ]]'
 check "provider has the models"     '[[ $(q $m "j.providers[\"anthropic-api\"].models.length") == 4 ]]'
-check "accounts in order"           '[[ $(q $a "j[\"anthropic-api\"].accounts.map(x=>x.name).join()") == main,floweredao ]]'
+check "accounts in order"           '[[ $(q $a "j[\"anthropic-api\"].accounts.map(x=>x.name).join()") == main,example ]]'
 check "keys match the Keychain"     '[[ $(q $a "j[\"anthropic-api\"].accounts.map(x=>x.key).join()") == "$K2,$K1" && $(q $a "j[\"anthropic-api\"].key") == $K2 ]]'
 check "first account is pinned"    '[[ $(q $a "j[\"anthropic-api\"].pinned") == main ]]'
 check "other auth entry kept"       '[[ $(q $a "j.other.key") == keep-me ]]'

@@ -37,13 +37,13 @@ run_age() { expect -f "$T/run.exp" -- "$@"; }
 # 1) Fake source HOME and Keychain
 H1=$T/home1 H2=$T/home2
 mkdir -p "$H1/.omo/agent" "$H1/.config/gcloud/configurations" "$H1/.config/gcloud/logs" \
-         "$H1/.ssh" "$H1/Library/Application Support/floweredao/data" "$H1/Library/Keychains"
+         "$H1/.ssh" "$H1/Library/Application Support/ExampleApp/data" "$H1/Library/Keychains"
 print -r -- 'FAKEVALUE-omo-auth' > "$H1/.omo/agent/auth.json"
 print -r -- 'FAKEVALUE-gcloud-cred' > "$H1/.config/gcloud/credentials.db"
 print -r -- 'FAKEVALUE-gcloud-conf' > "$H1/.config/gcloud/configurations/config_default"
 print -r -- 'noise' > "$H1/.config/gcloud/logs/run.log"
 print -r -- 'FAKEVALUE-ssh-key' > "$H1/.ssh/id_ed25519"
-print -r -- 'FAKEVALUE-app-cred' > "$H1/Library/Application Support/floweredao/data/credentials.json"
+print -r -- 'FAKEVALUE-app-cred' > "$H1/Library/Application Support/ExampleApp/data/credentials.json"
 chmod 600 "$H1/.omo/agent/auth.json" "$H1/.ssh/id_ed25519"; chmod 700 "$H1/.ssh"
 security create-keychain -p kc "$KC1"; security unlock-keychain -p kc "$KC1"
 security create-keychain -p kc "$KC2"; security unlock-keychain -p kc "$KC2"
@@ -59,7 +59,7 @@ print -r -- '.omo/agent/auth.json
 .ssh/id_ed25519
 .config/gcloud
 exclude:.config/gcloud/logs
-Library/Application Support/floweredao/data/credentials.json
+Library/Application Support/ExampleApp/data/credentials.json
 keychain:example-*
 keychain:gemini-api' > "$LAZYMAC_MANIFEST"
 
@@ -88,7 +88,7 @@ check "wrong passphrase writes nothing" '[[ -z $(ls -A $H2) ]]'
 mkdir -p "$H2/.omo/agent"; print -r -- 'old' > "$H2/.omo/agent/auth.json"
 HOME=$H2 LAZYMAC_KEYCHAIN=$KC2 run_age 1 "$REPO/bin/secrets-restore.sh" "$T/b.age" > "$T/restore.log"
 for f in .omo/agent/auth.json .config/gcloud/credentials.db .config/gcloud/configurations/config_default \
-         .ssh/id_ed25519 "Library/Application Support/floweredao/data/credentials.json"; do
+         .ssh/id_ed25519 "Library/Application Support/ExampleApp/data/credentials.json"; do
   check "restored $f"                   "cmp -s \"$H1/$f\" \"$H2/$f\""
   check "mode of $f has no group/other" "[[ \$(stat -f %Lp \"$H2/$f\") == [67]00 ]]"
 done
