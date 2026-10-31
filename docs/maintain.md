@@ -1,6 +1,6 @@
 # Keeping the list
 
-[Back to README](../README.md)
+English · [한국어](maintain-ko.md) · [Back to README](../README.md)
 
 How the catalog list is built, how to update it, and how to scan and prune items across your Macs.
 
@@ -119,7 +119,7 @@ A Mac with no LazyMac repo (or no bun) gets a job that runs the app itself, `laz
 
 ## History page
 
-The history page is a static site at `https://<project>.pages.dev`, where the project is the one named in `LAZYMAC_CF_PROJECT` (default `lazymac-history`; see [advanced settings](advanced.md#cloudflare-pages-project-lazymac_cf_project)). It shows every day's list, its counts, and what was added, removed, or changed (✅ ⛔ ❓) since the day before. Because the site is public, `bin/snapshot.ts build` publishes only names, subcategories, decisions, and the one-line description, leaves out the `secret` section and the `data` group (what lives only on this Mac), and refuses to publish (exit 5) when a word from `~/.config/lazymac/private-words` (`LAZYMAC_PRIVATE_WORDS`), an email address, a `/Users/` home path, or an IPv4 address shows up. It reads the Cloudflare API token and account ID from the macOS Keychain under service `$LAZYMAC_CF_KEYCHAIN` (default `lazymac-cloudflare`, accounts `api-token` and `account-id`, falling back to `wrangler login`) and creates the Pages project `lazymac-history` the first time.
+The history page is a static site at `https://<project>.pages.dev`, where the project is the one named in `LAZYMAC_CF_PROJECT` (default `lazymac-history`; see [advanced settings](advanced.md#cloudflare-pages-project-lazymac_cf_project)). It shows every day's list, its counts, and what was added, removed, or changed (✅ ⛔ ❓) since the day before. Because the site is public, `bin/snapshot.ts build` publishes only names, subcategories, decisions, and the one-line description, leaves out the `secret` section and the `data` group (what lives only on this Mac), and refuses to publish (exit 5) when a word from `~/.config/lazymac/private-words` (`LAZYMAC_PRIVATE_WORDS`), an email address, a `/Users/` home path, or an IPv4 address shows up. It reads the Cloudflare API token and account ID from the macOS Keychain under service `$LAZYMAC_CF_KEYCHAIN` (default `lazymac-cloudflare`, accounts `api-token` and `account-id`, falling back to `wrangler login`) and creates that Pages project the first time if it does not exist yet.
 
 ```sh
 bun bin/snapshot.ts take          # snapshots/<today>.tsv from catalog.tsv

@@ -14,7 +14,7 @@ README에는 짧은 순서만 있어요. 여기에는 단계마다 하는 일, �
 
 ## 1. 옛 맥을 떠나기 전에
 
-1. **암호화 묶음을 새로 싸서 올려요.** 로그인 파일, 키체인 항목, 개인 백그라운드 작업 파일과 스크립트가 함께 들어가요([secrets.md](secrets.md#encrypted-bundle)). `age`가 암호를 두 번 물으니 비밀번호 관리자에 보관해 두세요.
+1. **암호화 묶음을 새로 싸서 올려요.** 로그인 파일, 키체인 항목, 개인 백그라운드 작업 파일과 스크립트가 함께 들어가요([secrets-ko.md](secrets-ko.md#encrypted-bundle)). `age`가 암호를 두 번 물으니 비밀번호 관리자에 보관해 두세요.
    ```sh
    bin/secrets-pack.sh && git add secrets/secrets.tar.age && git commit -m "secrets: update encrypted bundle" && git push
    ```
@@ -67,7 +67,7 @@ Homebrew 설치기가 Xcode Command Line Tools도 같이 깔아요. `gh auth log
 - **내려받기 페이지가 열린 앱과 직접 설치 앱**: `downloads` 단계가 브라우저에 열어 준 페이지의 앱·글꼴과 `setup/byhand.tsv`에 안내된 앱(예: Visual Studio Code, LazyMac 앱 자체 등)을 설치해요.
 - **소스에서 빌드하는 앱**: `how=build`로 표시한 저장소를 클론해 빌드하고, 그 프로그램이 필요한 백그라운드 작업이 있다면 `bin/setup.sh jobs`를 다시 실행해요.
 - **권한 허용**(시스템 설정 → 개인정보 보호 및 보안, 앱이 물을 때): 터미널, 런처, 클립보드·창 관리 도구 등에 손쉬운 사용·화면 기록·입력 모니터링 권한을 허용해요. 예약 폴더 백업을 쓴다면 LazyMac에 전체 디스크 접근을 허용해요.
-- **다시 로그인**: 애플 ID 앱, Tailscale, 메신저, 메일, 브라우저, 데스크톱 앱처럼 기기 고유 키에 로그인을 묶어 두는 앱에 다시 로그인해요. 만료된 토큰이나 재발급 방법은 [secrets.md](secrets.md)를 참고해요.
+- **다시 로그인**: 애플 ID 앱, Tailscale, 메신저, 메일, 브라우저, 데스크톱 앱처럼 기기 고유 키에 로그인을 묶어 두는 앱에 다시 로그인해요. 만료된 토큰이나 재발급 방법은 [secrets-ko.md](secrets-ko.md)를 참고해요.
 - **자체 복원 안내가 있는 도구와 작업 프로젝트**: `how=restore`로 분류된 도구는 해당 안내에 따라 복원하고, 작업할 GitHub 저장소를 클론해요(`gh repo list`).
 
 ## 5. 결과 확인
