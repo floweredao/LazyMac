@@ -25,6 +25,17 @@ LazyMac의 목표는 하나예요. 다음 맥을 이 맥과 같은 앱과 도구
 
 <img src="docs/app-ko.png" width="720" alt="LazyMac 백업 화면">
 
+## 준비물
+
+| 하려는 일 | 필요한 것 |
+|---|---|
+| 앱 쓰기 | macOS 14 이상. 그 밖에는 없어요. `LazyMac.app`이 쓰는 스크립트를 안에 넣고 다녀요. |
+| 구글 드라이브로 백업 | [rclone](https://rclone.org) (`brew install rclone`)과 `rclone config`로 만든 리모트 하나. 폴더나 외장 디스크로 백업하면 둘 다 필요 없어요. |
+| 설정·폴더 백업 | [gitleaks](https://github.com/gitleaks/gitleaks) (`brew install gitleaks`). 파일마다 비밀값이 있는지 보고, 있는 파일은 빼고 복사해요. |
+| 비밀번호를 한 파일에 묶기 | [age](https://github.com/FiloSottile/age) (`brew install age`). |
+| 터미널로 목록 다루기 | [bun](https://bun.sh)과 `jq`. |
+| 소스에서 빌드 | 전체 Xcode와 bun ([소스에서 빌드하고 테스트하기](#소스에서-빌드하고-테스트하기) 참고). |
+
 ## 설치
 
 1. [Releases](https://github.com/floweredao/LazyMac/releases/latest)에서 `LazyMac-<버전>.zip`을 내려받아 풀고, `LazyMac.app`을 `/Applications`로 옮겨요.
@@ -117,6 +128,45 @@ gh repo clone alex/lazymac ~/Documents/lazymac
 ```
 
 단계마다 이미 된 것은 건너뛰어서, 다시 돌려도 안전해요. 단계별 설명은 [복원 안내](docs/restore-ko.md)에 있어요.
+
+## 소스에서 빌드하고 테스트하기
+
+`swift build`에는 **전체 Xcode**가 필요해요. 명령줄 도구(Command Line Tools)만으로는 안 돼요. 앱이 SwiftUI 매크로를 쓰는데 명령줄 도구에는 매크로 플러그인이 없어서, `@State` 줄마다 `external macro implementation type 'SwiftUIMacros.StateMacro' could not be found` 오류가 나요. 소스가 깨진 것처럼 보이지만 도구가 없는 것뿐이에요. 명령 하나에만 Xcode를 가리키려면 이렇게 해요.
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build --package-path app
+```
+
+맥 전체에 한 번 정해 두려면 `sudo xcode-select -s /Applications/Xcode.app`을 써요.
+
+```sh
+git clone https://github.com/floweredao/LazyMac.git && cd LazyMac
+app/build.sh                              # app/build/LazyMac.app과 릴리즈용 zip
+for t in tests/*.sh; do zsh "$t" || break; done   # 테스트 전체, 스크립트 15개
+zsh tests/due.sh                          # 또는 하나만
+```
+
+스크립트마다 검사 한 줄에 `ok` 또는 `FAIL`을 찍고, 하나라도 실패하면 0이 아닌 값으로 끝나요. `rclone`, `gitleaks`, `age`가 깔려 있어야 하고, 임시 폴더·임시 키체인·가짜 `defaults`로만 돌아서 이 맥의 실제 자료나 설정은 읽지 않아요. 같은 15개가 모든 풀 리퀘스트에서 돌아요([`.github/workflows/tests.yml`](.github/workflows/tests.yml)).
+
+## 설정
+
+모두 기본값이 있고, 파일은 앱이 알아서 써요. LazyMac을 다른 곳으로 보내고 싶을 때만 값을 정해요. 테스트도 같은 변수로 임시 폴더를 쓰게 만들어요.
+
+| 변수 | 기본값 | 가리키는 것 |
+|---|---|---|
+| `LAZYMAC_DATA` | `storage.conf`의 `data` 줄, 없으면 `~/LazyMac-data` | 자료 폴더: 목록, 날짜별 기록, 저장한 설정, 설치 목록 |
+| `LAZYMAC_STORAGE_CONF` | `~/Library/Application Support/lazymac/storage.conf` | 백업이 가는 곳: `backend`, `remote`, `local`, `files` ([자세히](docs/advanced-ko.md)) |
+| `LAZYMAC_BACKUP_CONF` | `~/Library/Application Support/lazymac/backup.conf` | 복사할 폴더와 추가로 뺄 패턴 ([자세히](docs/advanced-ko.md)) |
+| `LAZYMAC_HOOKS` | `~/.config/lazymac/hooks` | `before-daily`, `on-failure` 스크립트 ([자세히](docs/advanced-ko.md)) |
+| `LAZYMAC_HOST` | `scutil --get LocalHostName` | `machines.tsv`와 `inventory/`에 쓰는 이 맥의 이름 |
+| `LAZYMAC_KEYCHAIN` | `~/Library/Keychains/login.keychain-db` | 암호화한 비밀번호 묶음이 읽고 쓰는 키체인 ([자세히](docs/secrets.md)) |
+| `LAZYMAC_CF_KEYCHAIN` | `lazymac-cloudflare` | 날짜별 기록 페이지용 Cloudflare 토큰이 들어 있는 키체인 서비스 ([자세히](docs/advanced-ko.md)) |
+| `LAZYMAC_PRIVATE_WORDS` | `~/.config/lazymac/private-words` | 공개 기록 페이지에 절대 나가면 안 되는 낱말 |
+| `LAZYMAC_DAILY_LOGDIR` | `~/Library/Logs/lazymac-daily` | 자동 백업이 기록을 남기는 곳 |
+| `LAZYMAC_LAUNCHAGENTS_DIR` | `~/Library/LaunchAgents` | 자동 백업 작업이 설치되는 곳 |
+| `LAZYMAC_PRUNE_LIMIT` | `10` | 한 번의 자동 정리가 지울 수 있는 항목 수 |
+
+자료 폴더 안에는 `catalog.tsv`(목록 자체), `machines.tsv`(어느 맥이 주 맥인지와 처음 켜지는 프로필), `groups.tsv`(하위 분류 제목), `profiles/*.txt`, `setup/`(만들어진 설치 목록), `secrets/manifest.txt`가 있어요. [`example/`](example)에 복사해서 쓸 기본 묶음이 있어요. 이 경로들도 `LAZYMAC_SNAPSHOT_DIR`, `LAZYMAC_INVENTORY_DIR`, `LAZYMAC_PROFILES_DIR`, `LAZYMAC_SETUP_DIR`, `LAZYMAC_MACHINES`, `LAZYMAC_MANIFEST`, `LAZYMAC_SECRETS_OUT`로 옮길 수 있어요. 소스에 남은 다른 `LAZYMAC_*` 이름은 시계·네트워크·`launchctl`·`defaults`를 대신하는 테스트용이에요.
 
 ## 더 보기
 

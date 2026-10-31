@@ -25,6 +25,17 @@ Years of old files and leftovers stay behind.
 
 <img src="docs/app.png" width="720" alt="LazyMac Back Up screen">
 
+## Requirements
+
+| To | You need |
+|---|---|
+| Run the app | macOS 14 or newer. Nothing else: `LazyMac.app` carries the scripts it runs. |
+| Back up to Google Drive | [rclone](https://rclone.org) (`brew install rclone`) and one remote from `rclone config`. A folder or external disk needs neither. |
+| Back up settings and folders | [gitleaks](https://github.com/gitleaks/gitleaks) (`brew install gitleaks`), which checks each file for secrets before it is copied, and skips the ones that hold any. |
+| Lock passwords in one file | [age](https://github.com/FiloSottile/age) (`brew install age`). |
+| Work with the list from Terminal | [bun](https://bun.sh) and `jq`. |
+| Build from source | Full Xcode and bun (see [Build and test from source](#build-and-test-from-source)). |
+
 ## Install
 
 1. Download `LazyMac-<version>.zip` from [Releases](https://github.com/floweredao/LazyMac/releases/latest), unzip it, and move `LazyMac.app` to `/Applications`.
@@ -117,6 +128,45 @@ gh repo clone alex/lazymac ~/Documents/lazymac
 ```
 
 Each step skips what is already done, so you can run it again safely. The [restore guide](docs/restore.md) explains every step.
+
+## Build and test from source
+
+`swift build` needs **full Xcode**, not just the Command Line Tools. The app uses SwiftUI macros, and the Command Line Tools carry no macro plugins, so building against them fails with `external macro implementation type 'SwiftUIMacros.StateMacro' could not be found` on every `@State` line - which reads like broken source, but is only a missing toolchain. Point one command at Xcode:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build --package-path app
+```
+
+Or select it once for the whole Mac with `sudo xcode-select -s /Applications/Xcode.app`.
+
+```sh
+git clone https://github.com/floweredao/LazyMac.git && cd LazyMac
+app/build.sh                              # app/build/LazyMac.app, plus the zip for a release
+for t in tests/*.sh; do zsh "$t" || break; done   # the whole suite, 15 scripts
+zsh tests/due.sh                          # or one script on its own
+```
+
+Each script prints one `ok` or `FAIL` line per check and exits non-zero if any failed. They need `rclone`, `gitleaks` and `age` installed, and they run against temporary folders, a temporary Keychain and a fake `defaults`, so they never read this Mac's own data or settings. The same fifteen run on every pull request ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)).
+
+## Configuration
+
+Everything has a working default and the app writes these files for you. Set a variable only to point LazyMac somewhere else - the tests use the same ones to run against temporary folders.
+
+| Variable | Default | What it points at |
+|---|---|---|
+| `LAZYMAC_DATA` | the `data` line of `storage.conf`, else `~/LazyMac-data` | The data folder: the list, snapshots, saved settings and setup files |
+| `LAZYMAC_STORAGE_CONF` | `~/Library/Application Support/lazymac/storage.conf` | Where backups go: `backend`, `remote`, `local`, `files` ([details](docs/advanced.md#storage-configuration-storageconf)) |
+| `LAZYMAC_BACKUP_CONF` | `~/Library/Application Support/lazymac/backup.conf` | The folders to copy and any extra excludes ([details](docs/advanced.md#folder-list-backupconf)) |
+| `LAZYMAC_HOOKS` | `~/.config/lazymac/hooks` | `before-daily` and `on-failure` scripts ([details](docs/advanced.md#hooks-lazymac_hooks)) |
+| `LAZYMAC_HOST` | `scutil --get LocalHostName` | This Mac's name in `machines.tsv` and under `inventory/` |
+| `LAZYMAC_KEYCHAIN` | `~/Library/Keychains/login.keychain-db` | The Keychain the encrypted password bundle reads and writes ([details](docs/secrets.md)) |
+| `LAZYMAC_CF_KEYCHAIN` | `lazymac-cloudflare` | The Keychain service holding the Cloudflare token for the history page ([details](docs/advanced.md#cloudflare-pages-keychain-lazymac_cf_keychain)) |
+| `LAZYMAC_PRIVATE_WORDS` | `~/.config/lazymac/private-words` | Words that must never reach the public history page |
+| `LAZYMAC_DAILY_LOGDIR` | `~/Library/Logs/lazymac-daily` | Where the automatic backup writes its log |
+| `LAZYMAC_LAUNCHAGENTS_DIR` | `~/Library/LaunchAgents` | Where the automatic backup job is installed |
+| `LAZYMAC_PRUNE_LIMIT` | `10` | How many unused items one prune may drop at once |
+
+Inside the data folder: `catalog.tsv` (the list itself), `machines.tsv` (which Mac is the main one, and the profiles each starts with), `groups.tsv` (subcategory titles), `profiles/*.txt`, `setup/` (the generated install lists) and `secrets/manifest.txt`. [`example/`](example) holds a starter set to copy. Their paths can be moved too, with `LAZYMAC_SNAPSHOT_DIR`, `LAZYMAC_INVENTORY_DIR`, `LAZYMAC_PROFILES_DIR`, `LAZYMAC_SETUP_DIR`, `LAZYMAC_MACHINES`, `LAZYMAC_MANIFEST` and `LAZYMAC_SECRETS_OUT`. The remaining `LAZYMAC_*` names in the source are test hooks that stand in for the clock, the network, `launchctl` or `defaults`.
 
 ## More
 
