@@ -23,7 +23,7 @@ machines.tsv       host -> role (main runs the full daily job) and the profiles 
 profiles/          named choices over catalog.tsv: Mac profiles (from keep|empty|<base>) and add-ons on top
    │  bun bin/catalog.ts profile <base[,add-on...]> <dir>     the setup/ lists for a profile (setup.sh --profile)
    └  bun bin/catalog.ts compare <base[,add-on...]> [--host h]   missing / extra / same against a Mac's scan
-bin/snapshot.ts    snapshots/<date>.tsv (the list each day) -> history page https://lazymac-history.pages.dev/
+bin/snapshot.ts    snapshots/<date>.tsv (the list each day) -> history page at https://<LAZYMAC_CF_PROJECT>.pages.dev/
 bin/setup.sh       runs on the new Mac from setup/
 bin/nogit-backup.sh   copies the folders in backup.conf to the cloud with rclone, lists and restores them
 secrets/           manifest.txt (names only) + secrets.tar.age (encrypted)
@@ -116,7 +116,7 @@ A Mac with no LazyMac repo (or no bun) gets a job that runs the app itself, `laz
 
 ## History page
 
-[lazymac-history.pages.dev](https://lazymac-history.pages.dev/) shows every day's list, its counts, and what was added, removed, or changed (✅ ⛔ ❓) since the day before. Because the site is public, `bin/snapshot.ts build` publishes only names, subcategories, decisions, and the one-line description, leaves out the `secret` section and the `data` group (what lives only on this Mac), and refuses to publish (exit 5) when a word from `~/.config/lazymac/private-words` (`LAZYMAC_PRIVATE_WORDS`), an email address, a `/Users/` home path, or an IPv4 address shows up. It reads the Cloudflare API token and account ID from the macOS Keychain under service `$LAZYMAC_CF_KEYCHAIN` (default `lazymac-cloudflare`, accounts `api-token` and `account-id`, falling back to `wrangler login`) and creates the Pages project `lazymac-history` the first time.
+The history page is a static site at `https://<project>.pages.dev`, where the project is the one named in `LAZYMAC_CF_PROJECT` (default `lazymac-history`; see [advanced settings](advanced.md#cloudflare-pages-project-lazymac_cf_project)). It shows every day's list, its counts, and what was added, removed, or changed (✅ ⛔ ❓) since the day before. Because the site is public, `bin/snapshot.ts build` publishes only names, subcategories, decisions, and the one-line description, leaves out the `secret` section and the `data` group (what lives only on this Mac), and refuses to publish (exit 5) when a word from `~/.config/lazymac/private-words` (`LAZYMAC_PRIVATE_WORDS`), an email address, a `/Users/` home path, or an IPv4 address shows up. It reads the Cloudflare API token and account ID from the macOS Keychain under service `$LAZYMAC_CF_KEYCHAIN` (default `lazymac-cloudflare`, accounts `api-token` and `account-id`, falling back to `wrangler login`) and creates the Pages project `lazymac-history` the first time.
 
 ```sh
 bun bin/snapshot.ts take          # snapshots/<today>.tsv from catalog.tsv

@@ -42,6 +42,15 @@ check "index.html is there" "[[ -s $TMP/site/index.html ]]"
 check "pressing a count filters the list (aria-pressed follows)" \
   "[[ \$(bun $REPO/tests/history-filter.ts $TMP/site) == 'total:✅⛔✅|keep:✅✅|total:✅⛔✅|drop:⛔|ask:empty|total:✅⛔✅' ]]"
 
+# The Pages project to publish to, and the address the readiness check polls, both follow
+# LAZYMAC_CF_PROJECT. A *.pages.dev name belongs to whichever Cloudflare account registered it, so
+# one fixed name would let only that account publish a page.
+names() { bun -e "const m=await import('$REPO/bin/snapshot.ts'); console.log(m.PROJECT, m.SITE_URL)" }
+check "the project and its address follow LAZYMAC_CF_PROJECT" \
+  '[[ $(LAZYMAC_CF_PROJECT=example-history names) == "example-history https://example-history.pages.dev" ]]'
+check "without the variable, the documented default is used" \
+  '[[ $(names) == "lazymac-history https://lazymac-history.pages.dev" ]]'
+
 print -r -- "app	ai	P	Mail	 	keep	write to someone@example.com	x" >> $LAZYMAC_SNAPSHOT_DIR/2026-01-02.tsv
 set +e
 bun $REPO/bin/snapshot.ts build $TMP/site2 >/dev/null 2>&1

@@ -4,7 +4,7 @@
 
 **Install this Mac's apps and tools on your next Mac, clean.**
 
-[한국어](README-ko.md) · [Download](https://github.com/floweredao/LazyMac/releases/latest) · [Daily history](https://lazymac-history.pages.dev/)
+[한국어](README-ko.md) · [Download](https://github.com/floweredao/LazyMac/releases/latest) · [Daily history page](docs/maintain.md#history-page)
 
 </div>
 
@@ -160,6 +160,7 @@ Everything has a working default and the app writes these files for you. Set a v
 | `LAZYMAC_HOOKS` | `~/.config/lazymac/hooks` | `before-daily` and `on-failure` scripts ([details](docs/advanced.md#hooks-lazymac_hooks)) |
 | `LAZYMAC_HOST` | `scutil --get LocalHostName` | This Mac's name in `machines.tsv` and under `inventory/` |
 | `LAZYMAC_KEYCHAIN` | `~/Library/Keychains/login.keychain-db` | The Keychain the encrypted password bundle reads and writes ([details](docs/secrets.md)) |
+| `LAZYMAC_CF_PROJECT` | `lazymac-history` | The Cloudflare Pages project the history page is published to ([details](docs/advanced.md#cloudflare-pages-project-lazymac_cf_project)) |
 | `LAZYMAC_CF_KEYCHAIN` | `lazymac-cloudflare` | The Keychain service holding the Cloudflare token for the history page ([details](docs/advanced.md#cloudflare-pages-keychain-lazymac_cf_keychain)) |
 | `LAZYMAC_PRIVATE_WORDS` | `~/.config/lazymac/private-words` | Words that must never reach the public history page |
 | `LAZYMAC_DAILY_LOGDIR` | `~/Library/Logs/lazymac-daily` | Where the automatic backup writes its log |
