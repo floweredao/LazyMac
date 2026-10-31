@@ -45,7 +45,8 @@ class SnapError extends Error {
 }
 
 const today = () => new Date().toLocaleDateString("sv-SE");
-const validDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d));
+// Date.parse rolls 2026-02-31 over to March 3, so the parsed date must read back as the same day.
+const validDate = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d)) && new Date(d).toISOString().slice(0, 10) === d;
 
 // catalog.tsv by header name, so older catalogs from git history with other columns still read.
 export function catalogItems(text: string): Item[] {
