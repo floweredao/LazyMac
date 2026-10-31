@@ -36,38 +36,38 @@ run_age() { expect -f "$T/run.exp" -- "$@"; }
 
 # 1) Fake source HOME and Keychain
 H1=$T/home1 H2=$T/home2
-mkdir -p "$H1/.omo/agent" "$H1/.config/gcloud/configurations" "$H1/.config/gcloud/logs" \
+mkdir -p "$H1/.example-agent" "$H1/.config/gcloud/configurations" "$H1/.config/gcloud/logs" \
          "$H1/.ssh" "$H1/Library/Application Support/ExampleApp/data" "$H1/Library/Keychains"
-print -r -- 'FAKEVALUE-omo-auth' > "$H1/.omo/agent/auth.json"
+print -r -- 'FAKEVALUE-agent-auth' > "$H1/.example-agent/auth.json"
 print -r -- 'FAKEVALUE-gcloud-cred' > "$H1/.config/gcloud/credentials.db"
 print -r -- 'FAKEVALUE-gcloud-conf' > "$H1/.config/gcloud/configurations/config_default"
 print -r -- 'noise' > "$H1/.config/gcloud/logs/run.log"
 print -r -- 'FAKEVALUE-ssh-key' > "$H1/.ssh/id_ed25519"
 print -r -- 'FAKEVALUE-app-cred' > "$H1/Library/Application Support/ExampleApp/data/credentials.json"
-chmod 600 "$H1/.omo/agent/auth.json" "$H1/.ssh/id_ed25519"; chmod 700 "$H1/.ssh"
+chmod 600 "$H1/.example-agent/auth.json" "$H1/.ssh/id_ed25519"; chmod 700 "$H1/.ssh"
 security create-keychain -p kc "$KC1"; security unlock-keychain -p kc "$KC1"
 security create-keychain -p kc "$KC2"; security unlock-keychain -p kc "$KC2"
 security add-generic-password -a me -s example-api -w 'FAKEVALUE "quoted" $x' "$KC1"
-security add-generic-password -a me -s gemini-api -w 'FAKEVALUE-gemini' "$KC1"
+security add-generic-password -a me -s sample-api -w 'FAKEVALUE-sample' "$KC1"
 security add-generic-password -a bin -s example-dot -X 00ff10414243 "$KC1"
 security add-generic-password -a txt -s example-dot -w 'FAKEVALUE-dot' "$KC1"
 security add-generic-password -a me -s not-in-manifest -w 'FAKEVALUE-other' "$KC1"
 
 # Test manifest (the real one is personal data and is not in this repo)
 export LAZYMAC_MANIFEST=$T/manifest.txt
-print -r -- '.omo/agent/auth.json
+print -r -- '.example-agent/auth.json
 .ssh/id_ed25519
 .config/gcloud
 exclude:.config/gcloud/logs
 Library/Application Support/ExampleApp/data/credentials.json
 keychain:example-*
-keychain:gemini-api' > "$LAZYMAC_MANIFEST"
+keychain:sample-api' > "$LAZYMAC_MANIFEST"
 
 # 2) Dry run: names only
 dry=$(HOME=$H1 LAZYMAC_KEYCHAIN=$KC1 LAZYMAC_SECRETS_OUT=$T/b.age "$REPO/bin/secrets-pack.sh" --dry-run)
-check "dry-run lists a path"            '[[ $dry == *"~/.omo/agent/auth.json"* && $dry == *"~/.ssh/id_ed25519"* ]]'
+check "dry-run lists a path"            '[[ $dry == *"~/.example-agent/auth.json"* && $dry == *"~/.ssh/id_ed25519"* ]]'
 check "dry-run folder count skips logs" '[[ $dry == *"~/.config/gcloud/  (folder, 2 files)"* ]]'
-check "dry-run lists Keychain services" '[[ $dry == *"example-dot (x2)"* && $dry == *gemini-api* ]]'
+check "dry-run lists Keychain services" '[[ $dry == *"example-dot (x2)"* && $dry == *sample-api* ]]'
 check "dry-run prints no values"        '[[ $dry != *FAKEVALUE* && $dry != *00ff10* ]]'
 check "dry-run writes nothing"          '[[ ! -e $T/b.age ]]'
 
@@ -85,9 +85,9 @@ check "wrong passphrase fails"          '(( rc != 0 ))'
 check "wrong passphrase writes nothing" '[[ -z $(ls -A $H2) ]]'
 
 # 5) Restore into a fresh HOME with one conflicting file
-mkdir -p "$H2/.omo/agent"; print -r -- 'old' > "$H2/.omo/agent/auth.json"
+mkdir -p "$H2/.example-agent"; print -r -- 'old' > "$H2/.example-agent/auth.json"
 HOME=$H2 LAZYMAC_KEYCHAIN=$KC2 run_age 1 "$REPO/bin/secrets-restore.sh" "$T/b.age" > "$T/restore.log"
-for f in .omo/agent/auth.json .config/gcloud/credentials.db .config/gcloud/configurations/config_default \
+for f in .example-agent/auth.json .config/gcloud/credentials.db .config/gcloud/configurations/config_default \
          .ssh/id_ed25519 "Library/Application Support/ExampleApp/data/credentials.json"; do
   check "restored $f"                   "cmp -s \"$H1/$f\" \"$H2/$f\""
   check "mode of $f has no group/other" "[[ \$(stat -f %Lp \"$H2/$f\") == [67]00 ]]"
@@ -95,9 +95,9 @@ done
 check "excluded logs not restored"      '[[ ! -e $H2/.config/gcloud/logs ]]'
 check "~/.ssh is 700"                   '[[ $(stat -f %Lp $H2/.ssh) == 700 ]]'
 check "new folders are 700"             '[[ $(stat -f %Lp $H2/.config) == 700 ]]'
-check "conflict backed up"              '[[ $(cat $H2/.local/share/lazymac/restore-backup-*/.omo/agent/auth.json) == old ]]'
+check "conflict backed up"              '[[ $(cat $H2/.local/share/lazymac/restore-backup-*/.example-agent/auth.json) == old ]]'
 check "keychain text value"             '[[ $(security find-generic-password -s example-api -a me -w $KC2) == "FAKEVALUE \"quoted\" \$x" ]]'
-check "keychain second value"           '[[ $(security find-generic-password -s gemini-api -a me -w $KC2) == FAKEVALUE-gemini ]]'
+check "keychain second value"           '[[ $(security find-generic-password -s sample-api -a me -w $KC2) == FAKEVALUE-sample ]]'
 check "keychain binary value"           '[[ $(security find-generic-password -s example-dot -a bin -w $KC2) == 00ff10414243 ]]'
 check "keychain same service, 2nd account" '[[ $(security find-generic-password -s example-dot -a txt -w $KC2) == FAKEVALUE-dot ]]'
 check "unlisted keychain item left out" '! security find-generic-password -s not-in-manifest $KC2 >/dev/null 2>&1'

@@ -21,30 +21,16 @@
 | Google Cloud CLI | `~/.config/gcloud/` (`logs/`, `cache/`, `virtenv/` 제외) | `gcloud auth login`, `gcloud auth application-default login` | 재발급 |
 | rclone 설정 (예: `gdrive`) | `~/.config/rclone/rclone.conf` | LazyMac에서 연결(*백업 → 폴더*)하거나 `rclone config create gdrive drive scope=drive.file` | 재발급 |
 | Docker 레지스트리 로그인 | `~/.docker/config.json` | `docker login` | 재발급 |
-| 코딩 에이전트 인증 | `~/.omo/agent/auth.json`, `~/.codex/auth.json` | CLI로 다시 로그인 | 재발급 |
+| 코딩 에이전트 로그인 | 그 에이전트의 인증 파일, 예: `~/.codex/auth.json` | CLI로 다시 로그인 | 재발급 |
 
 ## 키체인 항목 예 (일반 암호)
 
 | 무엇 | 키체인 서비스 | 다시 얻는 법 | 종류 |
 |---|---|---|---|
 | Cloudflare Pages 배포 토큰 | `lazymac-cloudflare` (또는 `$LAZYMAC_CF_KEYCHAIN`, 계정 `api-token`과 `account-id`) | Cloudflare 대시보드 → My Profile → API Tokens에서 만든 뒤 `security add-generic-password`로 저장 | 재발급 |
-| omo용 Anthropic Console API 키 | `omo-anthropic-api` (계정마다 하나: `main`, `work`, ...) | Anthropic Console → API Keys에서 만든 뒤 `pbpaste \| bun bin/omo-anthropic.ts add <이름>` | 재발급 |
-| Gemini API 키 | `gemini-api` | Google AI Studio → API keys | 재발급 |
+| 직접 저장한 API 키 | 예: `example-api` | 그 서비스의 콘솔 | 재발급 |
 | GitHub CLI 토큰 | `gh:github.com` | `gh auth login` | 재발급 |
 | 앱 Safe Storage 키 | `Code Safe Storage`, `Slack Safe Storage`, `Notion Safe Storage` 등 | 앱이 알아서 만들어요. 앱에 다시 로그인하면 돼요 | 자동 |
-
-## omo: Anthropic API 키를 모두 한 공급자로
-
-`bin/omo-anthropic.ts`는 키체인의 `omo-anthropic-api` 항목을 모두 모아 omo 공급자 `anthropic-api` 하나로 만들어요. 키마다 계정이 하나씩이고, `main`이 맨 앞에 고정돼요. omo는 고정된 키를 먼저 쓰고, 그 키가 실패할 때(인증 오류, 사용량 제한, 크레딧 소진)만 다음 키로 넘어가요. `bin/setup.sh secrets`는 묶음을 복원한 뒤 `sync`를 알아서 실행해요.
-
-```sh
-pbpaste | bun bin/omo-anthropic.ts add main   # 새 키 저장(표준 입력에서 읽음) 후 sync
-bun bin/omo-anthropic.ts list                 # 계정 이름만 출력(값은 절대 출력하지 않음)
-bun bin/omo-anthropic.ts sync                 # ~/.omo/agent/models.json과 auth.json의 공급자를 다시 씀
-bun bin/omo-anthropic.ts check                # 키마다 GET /v1/models로 확인(비용 없음)
-```
-
-바꾼 뒤에는 omo를 다시 시작해요. 테스트: `tests/omo-anthropic.sh`(가짜 키로 임시 키체인과 임시 폴더를 써요).
 
 ## 다시 로그인할 계정 (옮길 로컬 파일이 없음)
 
@@ -68,8 +54,7 @@ exclude:.config/gcloud/virtenv
 
 # Keychain generic-password service names (glob patterns allowed)
 keychain:lazymac-cloudflare
-keychain:omo-anthropic-api
-keychain:gemini-api
+keychain:example-api
 keychain:gh:github.com
 
 # Private LaunchAgent plists and helper scripts not tracked in a public repo
