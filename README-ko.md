@@ -178,3 +178,8 @@ zsh tests/due.sh                          # 또는 하나만
 | [비밀번호와 로그인 정보](docs/secrets.md) | 암호화 묶음에 들어가는 것과 되살리는 방법 |
 | [목록 관리](docs/maintain.md) | `catalog.tsv`, 스캔, 자동 정리, 프로필, 스냅샷 |
 | [고급 설정](docs/advanced-ko.md) | `storage.conf`, `backup.conf`, 훅, 환경 변수 |
+| [기여하기](CONTRIBUTING.md) | 준비물, 빌드와 테스트, 변경을 보내는 방법 |
+
+## 라이선스
+
+MIT예요. [LICENSE](LICENSE)를 봐요.

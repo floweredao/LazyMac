@@ -178,3 +178,8 @@ Inside the data folder: `catalog.tsv` (the list itself), `machines.tsv` (which M
 | [Passwords and sign-ins](docs/secrets.md) | What goes into the encrypted bundle and how it is restored |
 | [Keeping the list](docs/maintain.md) | `catalog.tsv`, scans, pruning, profiles, snapshots |
 | [Advanced settings](docs/advanced.md) | `storage.conf`, `backup.conf`, hooks, environment variables |
+| [Contributing](CONTRIBUTING.md) | What you need, how to build and test, how to send a change |
+
+## License
+
+MIT. See [LICENSE](LICENSE).
