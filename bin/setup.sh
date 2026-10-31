@@ -37,6 +37,7 @@ if [[ ${1:-} == --profile ]]; then
 fi
 source "$S/versions.env"
 BACKUP=$HOME/.local/share/lazymac/restore-backup-$(date +%Y%m%d-%H%M%S)
+HOOKS=${LAZYMAC_HOOKS:-$HOME/.config/lazymac/hooks}
 
 STEPS=(brew node bun python scripts releases dotfiles secrets repos jobs downloads check)
 typeset -A ABOUT=(
@@ -204,9 +205,13 @@ step_dotfiles() {
   return $bad
 }
 
+# An executable hooks/after-secrets runs once the bundle is back, for steps of your own (for example a tool that
+# reads the restored Keychain items into its own config).
 step_secrets() {
   "$REPO/bin/secrets-restore.sh" || return 1
-  [[ -z $("$HOME/.bun/bin/bun" "$REPO/bin/omo-anthropic.ts" list 2>/dev/null) ]] || "$HOME/.bun/bin/bun" "$REPO/bin/omo-anthropic.ts" sync
+  [[ -x $HOOKS/after-secrets ]] || return 0
+  say "run     ${HOOKS/#$HOME/~}/after-secrets"
+  "$HOOKS/after-secrets" || { say "failed  after-secrets hook failed"; return 1; }
 }
 
 # setup/repos.tsv: <owner/repo> <folder> <command run inside it after cloning, or ->, from catalog rows how=repo.
@@ -331,6 +336,7 @@ preview_secrets() {
   local -a bundles; bundles=( "$DATA"/secrets/*.age(N) )
   (( ${#bundles} )) || { say "no encrypted bundle in ${DATA/#$HOME/~}/secrets: nothing to restore"; return 0; }
   say "would ask the passphrase and restore $(lines "$DATA/secrets/manifest.txt" | wc -l | tr -d ' ') files from ${bundles[1]:t}"
+  [[ ! -x $HOOKS/after-secrets ]] || say "would run ${HOOKS/#$HOME/~}/after-secrets"
 }
 preview_repos() {
   local repo folder command n=0
