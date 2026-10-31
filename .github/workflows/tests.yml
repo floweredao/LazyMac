@@ -19,21 +19,28 @@ jobs:
           curl -fsSL https://bun.sh/install | bash
           echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
 
+      # The scripts put /opt/homebrew/bin on PATH themselves, so Homebrew is where these belong.
+      # rclone: the backup, restore and capacity tests. gitleaks: the secret checks in settings.sh,
+      # nogit-backup.sh and daily.sh. age: the encrypted secrets bundle. A runner has none of them.
+      - name: Install rclone, gitleaks and age
+        run: brew install --quiet rclone gitleaks age
+
       - name: Show the tools the tests use
         run: |
           sw_vers
-          for t in zsh swift bun jq plutil defaults security; do printf '%-9s %s\n' "$t" "$(command -v "$t" || echo MISSING)"; done
+          for t in zsh swift bun jq plutil defaults security rclone gitleaks age sandbox-exec; do
+            printf '%-12s %s\n' "$t" "$(command -v "$t" || echo MISSING)"
+          done
           swift --version
 
-      # Left out on purpose: tests/secrets-roundtrip.sh needs age, and tests/local-no-rclone.sh
-      # needs gitleaks; neither comes with a runner. Everything else needs only the tools above.
+      # Every script under tests/, so a new one is picked up without editing this file. Each is its
+      # own group, a failure is annotated, and the job keeps going so one run shows every break.
       - name: Run the test scripts
         run: |
           status=0
-          for t in app-backup app-schedule app-setup-files due hosts nogit-backup omo-anthropic \
-                   profiles settings snapshot status storage-app storage-backend; do
-            echo "::group::tests/$t.sh"
-            zsh "tests/$t.sh" || { status=1; echo "::error::tests/$t.sh failed"; }
+          for t in tests/*.sh; do
+            echo "::group::$t"
+            zsh "$t" || { status=1; echo "::error::$t failed"; }
             echo "::endgroup::"
           done
           exit $status
