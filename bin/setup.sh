@@ -193,7 +193,8 @@ step_dotfiles() {
   done
   chmod 700 "$HOME/.ssh" 2>/dev/null; chmod 600 "$HOME/.ssh/config" 2>/dev/null
   local domain key type value rest bad=0 domains=()
-  while IFS=$'\t' read -r domain key type value rest; do
+  # A doubled tab in IFS is not whitespace to zsh, so an empty value is not replaced by the note after it.
+  while IFS=$'\t\t' read -r domain key type value rest; do
     [[ -z $domain || $domain == \#* ]] && continue
     if defaults write "$domain" "$key" "-$type" "$value"; then say "ok      $domain $key = $value"
     else say "failed  $domain $key"; bad=1; fi
