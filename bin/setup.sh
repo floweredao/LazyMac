@@ -45,7 +45,7 @@ typeset -A ABOUT=(
   node      "Node.js $NODE_VERSION with nvm, fixed links in ~/.local/bin, npm tools"
   bun       "bun and its global tools"
   python    "Python $PYTHON_VERSION with uv"
-  scripts   "tools that ship their own install script (Claude Code, CuaDriver)"
+  scripts   "tools that ship their own install script (setup/scripts.tsv)"
   releases  "apps from the latest GitHub release of their repo (.dmg or .zip)"
   dotfiles  "shell, git, tmux, npm and ssh settings from dotfiles/, and the Dock settings in dotfiles/macos-defaults.tsv"
   secrets   "sign-ins, API keys, private job files and scripts from the encrypted bundle (asks the passphrase)"
