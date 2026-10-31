@@ -62,6 +62,18 @@ exclude *.mov
 - `~/.config/lazymac/hooks/before-daily`: 매일 작업이 시작될 때 맥을 훑거나 Git 풀을 받기 전에 먼저 실행돼요(예: 밤사이 도는 패키지 업데이트가 끝날 때까지 대기). 종료 코드가 0이 아니어도 로그에 남기고 일일 작업을 이어 가요.
 - `~/.config/lazymac/hooks/on-failure`: `bin/daily.sh`가 실패했을 때 첫 번째 인자(`$1`)로 한 줄짜리 실패 메시지를 받아 실행돼요. 슬랙, 디스코드, 이메일, 웹훅 등으로 알림을 보낼 때 써요. 이 훅이 없으면 macOS 알림 센터로 알림을 띄워요.
 
+### Cloudflare Pages 할 프로젝트 (`LAZYMAC_CF_PROJECT`)
+
+`bun bin/snapshot.ts deploy`는 `LAZYMAC_CF_PROJECT`에 적은 Cloudflare Pages 프로젝트(기본값: `lazymac-history`)에 올리고, `https://<프로젝트>.pages.dev`에 가장 참여한 날짜가 나올 때까지 기다려요.
+
+`*.pages.dev` 주소는 먼저 등록한 Cloudflare 계정의 것이라, 기본 이름은 그 이름을 이미 가진 계정에서만 원하는 대로 동작해요. 내 페이지를 올리려면 내 프로젝트 이름을 정해줘요.
+
+```sh
+LAZYMAC_CF_PROJECT=my-mac-history bun bin/snapshot.ts deploy
+```
+
+프로젝트가 아직 없으면 `deploy`가 토큰의 계정 아래에 만들어요. 이름이 다른 계정에 이미 있어서 만들기가 실패하면, 오류 내용에 그 사정과 이 변수 이름이 나와요.
+
 ### Cloudflare Pages 키체인 (`LAZYMAC_CF_KEYCHAIN`)
 
 `bun bin/snapshot.ts deploy`는 날짜별 히스토리 정적 사이트를 Cloudflare Pages에 올려요. 이때 macOS 로그인 키체인에서 `LAZYMAC_CF_KEYCHAIN` 서비스 이름(기본값: `lazymac-cloudflare`)의 `api-token`과 `account-id` 항목을 읽어요.

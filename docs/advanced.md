@@ -62,6 +62,18 @@ Set `LAZYMAC_LAUNCHAGENTS_DIR` to write the job to another folder (the tests use
 - `~/.config/lazymac/hooks/before-daily`: runs at the start of `bin/daily.sh` before scanning or pulling (for example, to wait for a nightly package upgrade to finish). If it exits non-zero, the failure is logged and the daily job continues.
 - `~/.config/lazymac/hooks/on-failure`: runs when `bin/daily.sh` fails, receiving the one-line error message as its first argument (`$1`). Use this to forward failure alerts to Slack, Discord, email, or a webhook. When `on-failure` is not present, LazyMac shows a macOS notification instead.
 
+### Cloudflare Pages project (`LAZYMAC_CF_PROJECT`)
+
+`bun bin/snapshot.ts deploy` publishes to the Cloudflare Pages project named in `LAZYMAC_CF_PROJECT` (default: `lazymac-history`) and then waits until `https://<project>.pages.dev` serves the newest day.
+
+A `*.pages.dev` address belongs to whichever Cloudflare account registered it, so the default name only works for the account that already holds it. To publish your own page, set the variable to a project of your own:
+
+```sh
+LAZYMAC_CF_PROJECT=my-mac-history bun bin/snapshot.ts deploy
+```
+
+If the project does not exist yet, `deploy` creates it in the account the token belongs to. When creating it fails because the name is taken elsewhere, the error says so and names this variable.
+
 ### Cloudflare Pages Keychain (`LAZYMAC_CF_KEYCHAIN`)
 
 `bun bin/snapshot.ts deploy` publishes the static history site to Cloudflare Pages. It reads the Cloudflare API token and account ID from the macOS login Keychain under the service name in `LAZYMAC_CF_KEYCHAIN` (default: `lazymac-cloudflare`), using account names `api-token` and `account-id`:

@@ -4,7 +4,7 @@
 //   bun bin/snapshot.ts take [YYYY-MM-DD]   write snapshots/<date>.tsv from catalog.tsv (default: today, local time)
 //   bun bin/snapshot.ts build <dir>         write the history site (index.html + data/*.json) into <dir>
 //   bun bin/snapshot.ts deploy              build into .work/history-site and publish it to Cloudflare Pages
-//                                           (project lazymac-history), then wait until the live page shows the newest day
+//                                           (the project in $LAZYMAC_CF_PROJECT), then wait until the live page shows the newest day
 //
 // The page is public, so build leaves out rows that say what secrets exist (section secret) and data that
 // lives only on this Mac (group data), and only publishes names, groups, decisions and the one-line description.
@@ -19,7 +19,9 @@ import { parseGroups, thisHost } from "./catalog.ts";
 import { dataRoot, requireMain, syncData } from "./storage.ts";
 const ROOT = dataRoot;
 const SNAP_DIR = process.env.LAZYMAC_SNAPSHOT_DIR ?? join(ROOT, "snapshots");
-export const PROJECT = "lazymac-history";
+// A *.pages.dev address belongs to whichever Cloudflare account registered it, so one fixed name
+// can only ever serve one person: set LAZYMAC_CF_PROJECT to a Pages project of your own.
+export const PROJECT = process.env.LAZYMAC_CF_PROJECT ?? "lazymac-history";
 export const SITE_URL = `https://${PROJECT}.pages.dev`;
 const WRANGLER = "wrangler@4.152.0";
 const COLS = ["section", "group", "id", "name", "name_ko", "decision", "what_en", "what_ko"] as const;
@@ -151,7 +153,9 @@ async function deploy() {
   if (!list.stdout.toString().includes(`${PROJECT}.pages.dev`)) {
     // wrangler 4.15x hands a new project to Workers unless --force keeps it a plain Pages project (*.pages.dev).
     const c = wrangler("pages", "project", "create", PROJECT, "--production-branch", "main", "--force");
-    if (c.exitCode !== 0) throw new SnapError(4, `wrangler project create failed: ${c.stderr.toString().slice(-500)}`);
+    if (c.exitCode !== 0) {
+      throw new SnapError(4, `wrangler project create failed for ${PROJECT}; the name may belong to another Cloudflare account, in which case set LAZYMAC_CF_PROJECT to one of your own: ${c.stderr.toString().slice(-500)}`);
+    }
   }
   const d = wrangler("pages", "deploy", out, "--project-name", PROJECT, "--branch", "main", "--commit-dirty=true");
   if (d.exitCode !== 0) throw new SnapError(4, `DEPLOY_FAILED ${d.stderr.toString().slice(-800)}`);

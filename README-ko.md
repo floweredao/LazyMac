@@ -4,7 +4,7 @@
 
 **이 맥의 앱과 도구를 다음 맥에 깨끗하게 새로 설치해요.**
 
-[English](README.md) · [내려받기](https://github.com/floweredao/LazyMac/releases/latest) · [날짜별 기록](https://lazymac-history.pages.dev/)
+[English](README.md) · [내려받기](https://github.com/floweredao/LazyMac/releases/latest) · [날짜별 기록 페이지](docs/maintain.md#history-page)
 
 </div>
 
@@ -160,6 +160,7 @@ zsh tests/due.sh                          # 또는 하나만
 | `LAZYMAC_HOOKS` | `~/.config/lazymac/hooks` | `before-daily`, `on-failure` 스크립트 ([자세히](docs/advanced-ko.md)) |
 | `LAZYMAC_HOST` | `scutil --get LocalHostName` | `machines.tsv`와 `inventory/`에 쓰는 이 맥의 이름 |
 | `LAZYMAC_KEYCHAIN` | `~/Library/Keychains/login.keychain-db` | 암호화한 비밀번호 묶음이 읽고 쓰는 키체인 ([자세히](docs/secrets.md)) |
+| `LAZYMAC_CF_PROJECT` | `lazymac-history` | 날짜별 기록 페이지를 올리는 Cloudflare Pages 프로젝트 ([자세히](docs/advanced-ko.md)) |
 | `LAZYMAC_CF_KEYCHAIN` | `lazymac-cloudflare` | 날짜별 기록 페이지용 Cloudflare 토큰이 들어 있는 키체인 서비스 ([자세히](docs/advanced-ko.md)) |
 | `LAZYMAC_PRIVATE_WORDS` | `~/.config/lazymac/private-words` | 공개 기록 페이지에 절대 나가면 안 되는 낱말 |
 | `LAZYMAC_DAILY_LOGDIR` | `~/Library/Logs/lazymac-daily` | 자동 백업이 기록을 남기는 곳 |
