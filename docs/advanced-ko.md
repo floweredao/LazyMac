@@ -57,10 +57,11 @@ exclude *.mov
 
 ### 훅 (`LAZYMAC_HOOKS`)
 
-`bin/daily.sh`는 `~/.config/lazymac/hooks`(또는 `LAZYMAC_HOOKS`로 지정한 폴더)에 실행 권한이 있는 스크립트가 있으면 함께 실행해요.
+`bin/daily.sh`와 `bin/setup.sh`는 `~/.config/lazymac/hooks`(또는 `LAZYMAC_HOOKS`로 지정한 폴더)에 실행 권한이 있는 스크립트가 있으면 함께 실행해요.
 
 - `~/.config/lazymac/hooks/before-daily`: 매일 작업이 시작될 때 맥을 훑거나 Git 풀을 받기 전에 먼저 실행돼요(예: 밤사이 도는 패키지 업데이트가 끝날 때까지 대기). 종료 코드가 0이 아니어도 로그에 남기고 일일 작업을 이어 가요.
 - `~/.config/lazymac/hooks/on-failure`: `bin/daily.sh`가 실패했을 때 첫 번째 인자(`$1`)로 한 줄짜리 실패 메시지를 받아 실행돼요. 슬랙, 디스코드, 이메일, 웹훅 등으로 알림을 보낼 때 써요. 이 훅이 없으면 macOS 알림 센터로 알림을 띄워요.
+- `~/.config/lazymac/hooks/after-secrets`: `bin/setup.sh secrets`가 암호화 묶음을 복원한 뒤 마지막에 실행돼요(예: 복원된 키체인 항목을 다른 도구의 설정에 넣을 때). 복원이 실패하면 실행되지 않고, 0이 아닌 코드로 끝나면 `secrets` 단계를 실패로 보고해요.
 
 ### Cloudflare Pages 프로젝트 (`LAZYMAC_CF_PROJECT`)
 

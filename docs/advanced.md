@@ -57,10 +57,11 @@ Set `LAZYMAC_LAUNCHAGENTS_DIR` to write the job to another folder (the tests use
 
 ### Hooks (`LAZYMAC_HOOKS`)
 
-`bin/daily.sh` looks for executable hooks in `~/.config/lazymac/hooks` (or the directory set in `LAZYMAC_HOOKS`):
+`bin/daily.sh` and `bin/setup.sh` look for executable hooks in `~/.config/lazymac/hooks` (or the directory set in `LAZYMAC_HOOKS`):
 
 - `~/.config/lazymac/hooks/before-daily`: runs at the start of `bin/daily.sh` before scanning or pulling (for example, to wait for a nightly package upgrade to finish). If it exits non-zero, the failure is logged and the daily job continues.
 - `~/.config/lazymac/hooks/on-failure`: runs when `bin/daily.sh` fails, receiving the one-line error message as its first argument (`$1`). Use this to forward failure alerts to Slack, Discord, email, or a webhook. When `on-failure` is not present, LazyMac shows a macOS notification instead.
+- `~/.config/lazymac/hooks/after-secrets`: runs at the end of `bin/setup.sh secrets`, after the encrypted bundle is restored (for example, to load restored Keychain items into another tool's own config). It does not run when the restore fails, and if it exits non-zero the `secrets` step is reported as failed.
 
 ### Cloudflare Pages project (`LAZYMAC_CF_PROJECT`)
 

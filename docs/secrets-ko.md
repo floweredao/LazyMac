@@ -33,9 +33,11 @@
 | GitHub CLI 토큰 | `gh:github.com` | `gh auth login` | 재발급 |
 | 앱 Safe Storage 키 | `Code Safe Storage`, `Slack Safe Storage`, `Notion Safe Storage` 등 | 앱이 알아서 만들어요. 앱에 다시 로그인하면 돼요 | 자동 |
 
-## omo: Anthropic API 키를 모두 한 공급자로
+## 선택 기능: omo용 Anthropic API 키
 
-`bin/omo-anthropic.ts`는 키체인의 `omo-anthropic-api` 항목을 모두 모아 omo 공급자 `anthropic-api` 하나로 만들어요. 키마다 계정이 하나씩이고, `main`이 맨 앞에 고정돼요. omo는 고정된 키를 먼저 쓰고, 그 키가 실패할 때(인증 오류, 사용량 제한, 크레딧 소진)만 다음 키로 넘어가요. `bin/setup.sh secrets`는 묶음을 복원한 뒤 `sync`를 알아서 실행해요.
+[omo](https://github.com/code-yeongyu/oh-my-openagent) 코딩 에이전트를 쓰는 사람만 해당돼요. omo가 없어도 LazyMac은 똑같이 동작하고, 키체인에 `omo-anthropic-api` 항목이 없는 맥에서는 아래 내용이 하나도 실행되지 않아요.
+
+`bin/omo-anthropic.ts`는 키체인의 `omo-anthropic-api` 항목을 모두 모아 omo 공급자 `anthropic-api` 하나로 만들어요. 키마다 계정이 하나씩이고, `main`이 맨 앞에 고정돼요. omo는 고정된 키를 먼저 쓰고, 그 키가 실패할 때(인증 오류, 사용량 제한, 크레딧 소진)만 다음 키로 넘어가요. `bin/setup.sh secrets`는 묶음을 복원한 뒤 그런 항목이 있을 때만 `sync`를 실행해요. sync가 실패해도 경고만 하고 단계는 실패로 치지 않아요. 복원 뒤에 내 작업을 돌리려면 `after-secrets` 훅을 써요([고급 설정](advanced-ko.md#훅-lazymac_hooks)).
 
 ```sh
 pbpaste | bun bin/omo-anthropic.ts add main   # 새 키 저장(표준 입력에서 읽음) 후 sync

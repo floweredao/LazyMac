@@ -33,9 +33,11 @@ When cataloging credentials and state files on your Mac, group them into three k
 | GitHub CLI token | `gh:github.com` | `gh auth login` | Reissue |
 | App Safe Storage keys | `Code Safe Storage`, `Slack Safe Storage`, `Notion Safe Storage`, etc. | Created automatically by each app; sign in to the app again | Auto |
 
-## omo: all Anthropic API keys as one provider
+## Optional integration: Anthropic API keys for omo
 
-`bin/omo-anthropic.ts` turns every `omo-anthropic-api` Keychain item into one omo provider, `anthropic-api`, with one account per key (`main` first and pinned). omo always uses the pinned key first and moves to the next only when it fails (auth error, rate limit, or credit exhaustion). `bin/setup.sh secrets` runs `sync` automatically after restoring the bundle.
+Only for people who use the [omo](https://github.com/code-yeongyu/oh-my-openagent) coding agent. LazyMac works the same without it, and nothing below runs on a Mac with no `omo-anthropic-api` Keychain items.
+
+`bin/omo-anthropic.ts` turns every `omo-anthropic-api` Keychain item into one omo provider, `anthropic-api`, with one account per key (`main` first and pinned). omo always uses the pinned key first and moves to the next only when it fails (auth error, rate limit, or credit exhaustion). After restoring the bundle, `bin/setup.sh secrets` runs `sync` only when such items exist; a failed sync is a warning, not a failed step. To run a step of your own after the restore, use the `after-secrets` hook ([advanced settings](advanced.md#hooks-lazymac_hooks)).
 
 ```sh
 pbpaste | bun bin/omo-anthropic.ts add main   # store a new key (read from stdin), then sync
