@@ -16,7 +16,7 @@ groups.tsv         the subcategory titles (English, Korean) in display order; th
           Brewfile  npm.txt  bun.txt  scripts.tsv  releases.tsv  downloads.tsv  byhand.tsv  jobs.txt  versions.env
 
 bin/inventory.sh   read-only scan of this Mac -> inventory/<host>/ (what is here now; one folder per Mac)
-bin/scan.sh        inventory.sh, then commit and push only inventory/<host>/ (the app's "Scan This Mac")
+bin/scan.sh        inventory.sh, then copy the data folder to the backup place (the app's "Scan This Mac")
 bin/catalog.ts check   every Mac's scan vs catalog.tsv: new things (tagged with the Mac), missing keep items, out-of-date files
 bin/catalog.ts prune   removes rows for things the scans can see that are gone from every Mac (then render)
 machines.tsv       host -> role (main runs the full daily job) and the profiles the app starts with
@@ -97,11 +97,14 @@ The LaunchAgent `local.lazymac-daily` runs `bin/daily.sh`. Before starting, it r
 
 On the Mac whose role is `main` in `machines.tsv`:
 
-1. `bin/scan.sh --no-push` scans into `inventory/<host>/` and commits it after a `gitleaks` check.
-2. `bun bin/catalog.ts prune` and `render` remove rows for items gone from every Mac and update `catalog.tsv`, `setup/`, and the READMEs, then commit.
-3. `bun bin/snapshot.ts take` saves the day's list as `snapshots/<date>.tsv` and commits it, then `bin/scan.sh --push-only` pushes all commits (checking with `gitleaks` and pulling with `--rebase` if another Mac pushed first).
-4. `bun bin/snapshot.ts deploy` publishes the history page.
-5. When `~/Library/Application Support/lazymac/storage.conf` sets `files on` (file backup is `off` by default), `bin/nogit-backup.sh rclone` copies the folders in `backup.conf` and verifies them with `--check`.
+1. `refresh`: the other Macs' scans are brought in from the backup place, without overwriting local edits.
+2. `scan`: `bin/scan.sh --no-push` scans this Mac into `inventory/<host>/`, and stops the run if `gitleaks` finds a secret there.
+3. `list`: `bun bin/catalog.ts prune` and `render` remove rows for items gone from every Mac and update `catalog.tsv`, `setup/`, and the READMEs; `bun bin/snapshot.ts take` saves the day's list as `snapshots/<date>.tsv`.
+4. `settings`: `bin/settings.sh save` saves the settings files, leaving out any that `gitleaks` flags. Skipped when `LAZYMAC_DAILY_SKIP` contains `settings`.
+5. `copy`: the data folder is copied to the backup place.
+6. `folders`: when `~/Library/Application Support/lazymac/storage.conf` sets `files on` (file backup is `off` by default), `bin/nogit-backup.sh rclone` copies the folders in `backup.conf` and verifies them with `--check`.
+
+The daily job uses Git for nothing: it keeps the data folder in step with the backup place, and that is all. If you keep your list in a Git repository, committing and pushing it is yours to do, as is publishing the history page with `bun bin/snapshot.ts deploy`. The `--no-push` and `--push-only` flags of `bin/scan.sh` are older names kept for compatibility: they mean "skip the copy" and "copy only".
 
 The script holds a lock so two runs never overlap, stays quiet on success, and on failure runs `~/.config/lazymac/hooks/on-failure "<message>"` (or shows a macOS notification if no hook is installed). Log: `~/Library/Logs/lazymac-daily/<date>.log` (kept for 30 days). Run it now:
 
@@ -109,7 +112,7 @@ The script holds a lock so two runs never overlap, stays quiet on success, and o
 launchctl kickstart gui/$(id -u)/local.lazymac-daily
 ```
 
-On any other Mac, the same script scans that Mac and pushes `inventory/<host>/`, then backs up its folders when `files on` is set in `storage.conf` and that Mac has folders in `backup.conf`. Another Mac has no scheduled job unless you turn on *Back up automatically* in the app (Back Up > Schedule, or LazyMac > Settings): that writes `~/Library/LaunchAgents/local.lazymac-daily.plist` with the chosen schedule and loads it; turning it off unloads and removes it. The main Mac's 04:00 schedule can be changed there too; `setup.sh jobs` registers the daily job only on the main Mac.
+On any other Mac, the same script scans that Mac and copies its `inventory/<host>/` to the backup place, then backs up its folders when `files on` is set in `storage.conf` and that Mac has folders in `backup.conf`. Another Mac has no scheduled job unless you turn on *Back up automatically* in the app (Back Up > Schedule, or LazyMac > Settings): that writes `~/Library/LaunchAgents/local.lazymac-daily.plist` with the chosen schedule and loads it; turning it off unloads and removes it. The main Mac's 04:00 schedule can be changed there too; `setup.sh jobs` registers the daily job only on the main Mac.
 
 Test hook: `lazymac --schedule <spec>|off|show` (`tests/app-schedule.sh` runs it against a temporary folder).
 A Mac with no LazyMac repo (or no bun) gets a job that runs the app itself, `lazymac --run-backup`: it copies and compares the folders in `backup.conf`, logs to the same folder, and shows a notification when it fails (`tests/app-backup.sh`). That job reads the folders as LazyMac, so LazyMac needs Full Disk Access.
