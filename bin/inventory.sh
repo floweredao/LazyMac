@@ -6,6 +6,9 @@
 #
 # Usage: bin/inventory.sh [output-dir]      (default: <repo>/inventory/<host>, host = scutil --get LocalHostName
 #                                           or LAZYMAC_HOST; each Mac keeps its own folder)
+# Optional ~/.config/lazymac/inventory.conf (LAZYMAC_INVENTORY_CONF), one setting per line:
+#   version <command>        also record `<command> --version` in versions.txt
+#   skip-process <pattern>   leave resident programs whose path matches this extended regex out of processes.tsv
 set -u
 export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.bun/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export HOMEBREW_NO_ENV_HINTS=1 HOMEBREW_NO_AUTO_UPDATE=1 LC_ALL=en_US.UTF-8
@@ -16,6 +19,20 @@ HOST=${LAZYMAC_HOST:-$(scutil --get LocalHostName 2>/dev/null || hostname -s)}
 OUT=${1:-$DATA/inventory/$HOST}
 mkdir -p "$OUT"
 PB=/usr/libexec/PlistBuddy
+CONF=${LAZYMAC_INVENTORY_CONF:-$HOME/.config/lazymac/inventory.conf}
+VERSIONS=(brew bun node npm uv git gh mas gitleaks)
+SKIP='/CoreSimulator/|/target/(debug|release)/'
+if [[ -f $CONF ]]; then
+  while IFS= read -r line || [[ -n $line ]]; do
+    read -r key val <<< "$line"
+    [[ -z $key || $key == \#* ]] && continue
+    case $key in
+      version) VERSIONS+=("$val") ;;
+      skip-process) SKIP+="|$val" ;;
+      *) print -u2 -r -- "inventory.conf: unknown line: $line" ;;
+    esac
+  done < "$CONF"
+fi
 tilde() { sed "s#$HOME#~#g"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 plist() { $PB -c "Print :$2" "$1" 2>/dev/null; }
@@ -81,11 +98,11 @@ loaded=$(launchctl list 2>/dev/null)
 } > "$OUT/launchd.tsv"
 
 # 4) Resident programs not shipped by Apple: apps, Homebrew and home-folder binaries.
-#    Simulator runtimes and project build/evidence folders are skipped as noise.
+#    Simulator runtimes and build output are skipped as noise, plus any skip-process pattern.
 {
   print "# program"
   ps -axo comm= | grep -E "^(/Applications/|/Library/Application Support/|/opt/homebrew/|$HOME/)" \
-    | grep -vE '/CoreSimulator/|/Documents/|/\.omo/evidence/|/target/(debug|release)/' \
+    | grep -vE "$SKIP" \
     | sed -E 's#(\.app)/.*#\1#; s#/Cellar/([^/]+)/[^/]+/#/Cellar/\1/*/#' | tilde | sort -u
 } > "$OUT/processes.tsv"
 
@@ -115,7 +132,7 @@ ls ~/Library/Fonts 2>/dev/null > "$OUT/fonts.txt"
 # 7) Tool versions
 {
   print "macOS $(sw_vers -productVersion) ($(uname -m))"
-  for c in brew bun node npm uv git gh mas gitleaks herdr omo; do
+  for c in $VERSIONS; do
     have $c && print -r -- "$c $($c --version 2>/dev/null | head -1)"
   done
 } | tilde > "$OUT/versions.txt"

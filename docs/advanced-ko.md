@@ -36,6 +36,21 @@ exclude *.mov
 
 `bin/nogit-backup.sh`는 의존성과 빌드 결과물(`node_modules`, `.build`, `dist`, `DerivedData`, `target`, `.venv` 등), 비밀값 파일(`.env`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `*credentials*.json`), `gitleaks`가 비밀값으로 탐지한 파일, 그리고 이미 `origin` 원격지가 연결된 하위 Git 저장소를 자동으로 건너뛰어요.
 
+이 맥에서 더 빼고 싶은 것은 `exclude <패턴>` 줄로 더해요(예: 내가 쓰는 도구의 캐시 폴더).
+
+### 스캔 추가 설정 (`inventory.conf`)
+
+`bin/inventory.sh`는 LazyMac이 직접 쓰는 도구의 버전을 적고, 시뮬레이터 런타임과 빌드 결과물은 상주 프로그램 목록에서 빼요. 더하고 싶은 게 있으면 `~/.config/lazymac/inventory.conf`(또는 `LAZYMAC_INVENTORY_CONF`로 지정한 파일)에 적어요.
+
+```text
+# `<명령> --version`도 함께 적기
+version rustc
+# 경로가 이 확장 정규식에 맞는 프로그램은 processes.tsv에서 빼기
+skip-process /Projects/.*/build/
+```
+
+모르는 줄은 알려 주고 건너뛰어요. 파일이 없으면 기본값만 써요.
+
 ## 자동 백업 작업 (`local.lazymac-daily`)
 
 이 파일은 직접 쓰지 않아요. **자동으로 백업**을 켜면(백업 > 일정, 또는 LazyMac > 설정) 이 맥에 맞는 `~/Library/LaunchAgents/local.lazymac-daily.plist`를 만들고 `launchctl bootstrap`으로 등록해요. 끄면 등록을 해제하고 파일을 지워요. 일정만 바꿀 때는 기존 파일의 다른 키를 그대로 둬요. 터미널에서는 `/Applications/LazyMac.app/Contents/MacOS/lazymac --schedule daily:04:00`이 같은 일을 해요(`hourly[:MM]`, `every:<N>[:HH:MM]`, `daily:HH:MM`, `weekly:<0-6>:HH:MM`, `show`, `off`).

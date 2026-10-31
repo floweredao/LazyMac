@@ -59,7 +59,7 @@ fi
 [[ -n ${NOGIT_BACKUP_ONLY:-} ]] && TARGETS=(${(M)TARGETS:#*${NOGIT_BACKUP_ONLY}*})
 EXCLUDES=(
   node_modules .build build dist DerivedData target .next .turbo .cache __pycache__
-  .venv venv .gradle Pods .wrangler .senpi .codegraph .work tmp .DS_Store senpi-task _deps
+  .venv venv .gradle Pods .wrangler .work tmp .DS_Store _deps
   .env '.env.*' '*.pem' '*.key' '*.p12' '*.keystore' 'id_rsa*' 'id_ed25519*' '*credentials*.json'
   $EXTRA
 )

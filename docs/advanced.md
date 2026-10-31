@@ -36,6 +36,21 @@ exclude *.mov
 
 `bin/nogit-backup.sh` always skips dependencies and build caches (`node_modules`, `.build`, `dist`, `DerivedData`, `target`, `.venv`, etc.), secret-looking files (`.env`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `*credentials*.json`), any file flagged by `gitleaks`, and sub-folders that are already Git repositories with an `origin` remote.
 
+To skip more on one Mac, add `exclude <pattern>` lines (for example the cache folder of a tool you use).
+
+### Scan extras (`inventory.conf`)
+
+`bin/inventory.sh` records the versions of the tools LazyMac itself uses and leaves simulator runtimes and build output out of the resident-program list. To add your own, write `~/.config/lazymac/inventory.conf` (or point `LAZYMAC_INVENTORY_CONF` at another file):
+
+```text
+# also record `<command> --version`
+version rustc
+# leave programs whose path matches this extended regex out of processes.tsv
+skip-process /Projects/.*/build/
+```
+
+An unknown line is reported and skipped. Without the file, the scan uses only the defaults.
+
 ## The automatic backup job (`local.lazymac-daily`)
 
 You do not write this file by hand. Turning on **Back up automatically** (Back Up > Schedule, or LazyMac > Settings) writes `~/Library/LaunchAgents/local.lazymac-daily.plist` for this Mac and loads it with `launchctl bootstrap`; turning it off unloads and removes it. Changing the schedule keeps every other key of the existing file. From Terminal, `/Applications/LazyMac.app/Contents/MacOS/lazymac --schedule daily:04:00` does the same (`hourly[:MM]`, `every:<N>[:HH:MM]`, `daily:HH:MM`, `weekly:<0-6>:HH:MM`, `show`, or `off`).
