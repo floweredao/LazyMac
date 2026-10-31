@@ -59,7 +59,8 @@ tmp=$(mktemp "$TSV.XXXXXX") || exit 1
 n=0
 if [[ -f $TSV ]]; then
   while IFS= read -r line || [[ -n $line ]]; do
-    IFS=$'\t' read -r domain key kind value rest <<< "$line"
+    # A doubled tab in IFS is not whitespace to zsh, so an empty value keeps its own field.
+    IFS=$'\t\t' read -r domain key kind value rest <<< "$line"
     if [[ -n $domain && $domain != \#* && -n $key ]] && cur=$(current "$domain" "$key"); then
       line="$domain	$key	$cur${rest:+	$rest}"
       n=$((n + 1))

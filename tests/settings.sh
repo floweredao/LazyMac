@@ -38,4 +38,12 @@ check "a changed file is saved again" '[[ $(<"$D/.zshrc") == "export EDITOR=vim"
 check "a file this Mac no longer has keeps its saved copy" '[[ $(<"$D/.tmux.conf") == "set -g mouse on" ]]'
 check "an existing list keeps its lines and notes and gets this Mac's values" \
   '[[ $(<"$D/macos-defaults.tsv") == $'"'"'# my list\ncom.apple.dock\ttilesize\tfloat\t48\tkeep this note\ncom.example.app\tKnob\tbool\ttrue'"'"' ]]'
+
+# An empty string value leaves two tabs in a row; the note after it must stay a note.
+printf '#!/bin/zsh\n[[ "$2/$3" == com.example.app/Title ]] || exec %s "$@"\n[[ $1 != read-type ]] || print "Type is string"\n' "$LAZYMAC_DEFAULTS" > "$TMP/defaults-empty"
+chmod +x "$TMP/defaults-empty"
+printf 'com.example.app\tTitle\tstring\t\tempty on purpose\n' > "$D/macos-defaults.tsv"
+LAZYMAC_DEFAULTS=$TMP/defaults-empty save
+check "an empty value keeps the note after it" \
+  '[[ $(<"$D/macos-defaults.tsv") == $'"'"'com.example.app\tTitle\tstring\t\tempty on purpose'"'"' ]]'
 exit $fail
