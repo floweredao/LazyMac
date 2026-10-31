@@ -185,7 +185,8 @@ case ${1:-list} in
       if [[ $BACKEND == local ]]; then
         dest="$REMOTE/$(rel_of $t)"
         if [[ $kind == check ]]; then
-          changes=$(rsync -rnc --out-format='%n' "${f[@]}" "$t/" "$dest/") || rc=1
+          # -l like the backup's -a: without it rsync prints "skipping non-regular file" for each symlink.
+          changes=$(rsync -rlnc --out-format='%n' "${f[@]}" "$t/" "$dest/") || rc=1
           [[ -z $changes ]] || { print -r -- "$changes"; rc=1; }
         else
           dry=(); [[ -z $kind ]] && dry=(-n)
