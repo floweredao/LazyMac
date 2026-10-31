@@ -4,7 +4,7 @@
 
 **이 맥의 앱과 도구를 다음 맥에 깨끗하게 새로 설치해요.**
 
-[English](README.md) · [내려받기](https://github.com/floweredao/LazyMac/releases/latest) · [날짜별 기록 페이지](docs/maintain.md#history-page)
+[English](README.md) · [내려받기](https://github.com/floweredao/LazyMac/releases/latest) · [날짜별 기록 페이지](docs/maintain-ko.md#history-page)
 
 </div>
 
@@ -49,7 +49,7 @@ LazyMac의 목표는 하나예요. 다음 맥을 이 맥과 같은 앱과 도구
 |---|---|---|
 | 앱과 도구 | 설치된 앱, Homebrew 패키지, App Store 앱, 전역 명령줄 도구, 글꼴, 백그라운드 작업 목록 | 이 맥을 읽기만 하는 스캔 |
 | 설정 | 셸, Git, tmux, npm, SSH 설정 파일과 Dock·Finder 설정 | `bin/settings.sh`. 비밀값이 든 것 같은 파일은 건너뛰어요 |
-| 비밀번호와 로그인 정보 | SSH 키, 로그인 파일, 고른 키체인 항목을 내 암호로 잠근 파일 하나 | `bin/secrets-pack.sh` ([자세히](docs/secrets.md)) |
+| 비밀번호와 로그인 정보 | SSH 키, 로그인 파일, 고른 키체인 항목을 내 암호로 잠근 파일 하나 | `bin/secrets-pack.sh` ([자세히](docs/secrets-ko.md)) |
 | 파일과 폴더 (선택) | iCloud나 GitHub에 없는, 직접 고른 폴더. 직접 켜기 전까지 꺼져 있어요 | `bin/nogit-backup.sh` |
 
 저장하기 전에 늘 `gitleaks`로 검사해서, 비밀번호가 목록에 섞여 들어가지 않아요.
@@ -159,7 +159,7 @@ zsh tests/due.sh                          # 또는 하나만
 | `LAZYMAC_BACKUP_CONF` | `~/Library/Application Support/lazymac/backup.conf` | 복사할 폴더와 추가로 뺄 패턴 ([자세히](docs/advanced-ko.md)) |
 | `LAZYMAC_HOOKS` | `~/.config/lazymac/hooks` | `before-daily`, `on-failure` 스크립트 ([자세히](docs/advanced-ko.md)) |
 | `LAZYMAC_HOST` | `scutil --get LocalHostName` | `machines.tsv`와 `inventory/`에 쓰는 이 맥의 이름 |
-| `LAZYMAC_KEYCHAIN` | `~/Library/Keychains/login.keychain-db` | 암호화한 비밀번호 묶음이 읽고 쓰는 키체인 ([자세히](docs/secrets.md)) |
+| `LAZYMAC_KEYCHAIN` | `~/Library/Keychains/login.keychain-db` | 암호화한 비밀번호 묶음이 읽고 쓰는 키체인 ([자세히](docs/secrets-ko.md)) |
 | `LAZYMAC_CF_PROJECT` | `lazymac-history` | 날짜별 기록 페이지를 올리는 Cloudflare Pages 프로젝트 ([자세히](docs/advanced-ko.md)) |
 | `LAZYMAC_CF_KEYCHAIN` | `lazymac-cloudflare` | 날짜별 기록 페이지용 Cloudflare 토큰이 들어 있는 키체인 서비스 ([자세히](docs/advanced-ko.md)) |
 | `LAZYMAC_PRIVATE_WORDS` | `~/.config/lazymac/private-words` | 공개 기록 페이지에 절대 나가면 안 되는 낱말 |
@@ -175,8 +175,8 @@ zsh tests/due.sh                          # 또는 하나만
 |---|---|
 | [자세한 안내](docs/guide-ko.md) | 앱 화면, 앱 출처, 프로필, 여러 맥, 릴리즈 빌드 |
 | [복원 안내](docs/restore-ko.md) | 옛 맥 점검 목록, `bin/setup.sh` 단계, 직접 할 일 |
-| [비밀번호와 로그인 정보](docs/secrets.md) | 암호화 묶음에 들어가는 것과 되살리는 방법 |
-| [목록 관리](docs/maintain.md) | `catalog.tsv`, 스캔, 자동 정리, 프로필, 스냅샷 |
+| [비밀번호와 로그인 정보](docs/secrets-ko.md) | 암호화 묶음에 들어가는 것과 되살리는 방법 |
+| [목록 관리](docs/maintain-ko.md) | `catalog.tsv`, 스캔, 자동 정리, 프로필, 스냅샷 |
 | [고급 설정](docs/advanced-ko.md) | `storage.conf`, `backup.conf`, 훅, 환경 변수 |
 | [기여하기](CONTRIBUTING.md) | 준비물, 빌드와 테스트, 변경을 보내는 방법 |
 

@@ -1,6 +1,6 @@
 # Secrets index
 
-[Back to README](../README.md)
+English · [한국어](secrets-ko.md) · [Back to README](../README.md)
 
 **No plain-text secret values are stored in this repository.** This guide explains how LazyMac categorizes credentials, what goes into `secrets/manifest.txt`, and how `bin/secrets-pack.sh` and `bin/secrets-restore.sh` move them to a new Mac inside one encrypted archive.
 
