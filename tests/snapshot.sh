@@ -57,4 +57,13 @@ bun $REPO/bin/snapshot.ts build $TMP/site2 >/dev/null 2>&1
 code=$?
 set -e
 check "a mail address makes build refuse (exit 5) and write nothing" "[[ $code == 5 && ! -e $TMP/site2 ]]"
+
+# A day past the end of its month does not exist: take refuses it like any other bad date.
+set +e
+LAZYMAC_SNAPSHOT_DIR=$TMP/take bun $REPO/bin/snapshot.ts take 2026-02-31 >/dev/null 2>&1
+code=$?
+LAZYMAC_SNAPSHOT_DIR=$TMP/take bun $REPO/bin/snapshot.ts take 2024-02-29 >/dev/null 2>&1
+set -e
+check "take refuses a day that does not exist (exit 2) and writes nothing" "[[ $code == 2 && ! -e $TMP/take/2026-02-31.tsv ]]"
+check "take accepts a leap day" "[[ -f $TMP/take/2024-02-29.tsv ]]"
 exit $fail
