@@ -27,6 +27,9 @@ check "backend local copies to the configured folder with spaces" '[[ -f "$dest/
 check "local copy uses the same secret and dependency exclusions" '[[ ! -e "$dest/.env" && ! -e "$dest/node_modules" && -f "$dest/.env.example" ]]'
 check "local copy never deletes destination files" '[[ -f "$TMP/storage/retained/file" ]]'
 check "local check passes after copying" 'script rclone --check'
+ln -s file.txt "$HOME/Documents/my notes/link"
+script rclone
+check "local check passes after copying a folder that holds a symlink" 'script rclone --check'
 printf 'HELLO\n' > "$HOME/Documents/my notes/file.txt"
 touch -t 202001010000 "$HOME/Documents/my notes/file.txt"
 check "local check detects changed bytes, even at the same size" '! script rclone --check'
