@@ -1,17 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Sample only. LazyMac writes the real job for this Mac when you turn on "Back up automatically"
+  (Back Up > Schedule), at ~/Library/LaunchAgents/local.lazymac-daily.plist, with your paths and schedule.
+  Placeholders: /Users/you = your home folder, /Users/you/lazymac = your LazyMac list repo (any folder).
+  Without a list repo or bun, ProgramArguments is the app's own binary
+  (/Applications/LazyMac.app/Contents/MacOS/lazymac) with its run-backup and if-due options.
+  bun starts the script because a /bin/zsh started by launchd cannot read ~/Documents (privacy rules);
+  bun can, and its child zsh inherits that.
+-->
 <plist version="1.0"><dict>
 <key>Label</key><string>local.lazymac-daily</string>
-<!-- launched through bun: /bin/zsh started by launchd has no access to ~/Documents (TCC); bun does, and its child zsh inherits it -->
-<key>ProgramArguments</key><array><string>/Users/USER/.bun/bin/bun</string><string>exec</string><string>/bin/zsh /Users/USER/Documents/omo/lazymac/bin/daily.sh</string></array>
-<key>WorkingDirectory</key><string>/Users/USER/Documents/omo/lazymac</string>
+<key>ProgramArguments</key><array><string>/Users/you/.bun/bin/bun</string><string>exec</string><string>/bin/zsh '/Users/you/lazymac/bin/daily.sh' --if-due</string></array>
+<key>WorkingDirectory</key><string>/Users/you/lazymac</string>
 <key>EnvironmentVariables</key><dict>
-  <key>HOME</key><string>/Users/USER</string>
-  <key>PATH</key><string>/opt/homebrew/bin:/opt/homebrew/sbin:/Users/USER/.bun/bin:/Users/USER/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  <key>HOME</key><string>/Users/you</string>
+  <key>PATH</key><string>/opt/homebrew/bin:/opt/homebrew/sbin:/Users/you/.bun/bin:/Users/you/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 </dict>
 <key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+<!-- Catch-up: also start at login and every 30 minutes; bin/due.sh (--if-due) runs a backup only when one is due. -->
+<key>RunAtLoad</key><true/>
+<key>StartInterval</key><integer>1800</integer>
+<key>AssociatedBundleIdentifiers</key><array><string>com.floweredao.lazymac</string></array>
 <key>ProcessType</key><string>Background</string>
 <key>LowPriorityIO</key><true/>
-<key>StandardOutPath</key><string>/Users/USER/Library/Logs/lazymac-daily/launchd.log</string>
-<key>StandardErrorPath</key><string>/Users/USER/Library/Logs/lazymac-daily/launchd.log</string>
+<key>StandardOutPath</key><string>/Users/you/Library/Logs/lazymac-daily/launchd.log</string>
+<key>StandardErrorPath</key><string>/Users/you/Library/Logs/lazymac-daily/launchd.log</string>
 </dict></plist>

@@ -36,6 +36,23 @@ exclude *.mov
 
 `bin/nogit-backup.sh`는 의존성과 빌드 결과물(`node_modules`, `.build`, `dist`, `DerivedData`, `target`, `.venv` 등), 비밀값 파일(`.env`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `*credentials*.json`), `gitleaks`가 비밀값으로 탐지한 파일, 그리고 이미 `origin` 원격지가 연결된 하위 Git 저장소를 자동으로 건너뛰어요.
 
+## 자동 백업 작업 (`local.lazymac-daily`)
+
+이 파일은 직접 쓰지 않아요. **자동으로 백업**을 켜면(백업 > 일정, 또는 LazyMac > 설정) 이 맥에 맞는 `~/Library/LaunchAgents/local.lazymac-daily.plist`를 만들고 `launchctl bootstrap`으로 등록해요. 끄면 등록을 해제하고 파일을 지워요. 일정만 바꿀 때는 기존 파일의 다른 키를 그대로 둬요. 터미널에서는 `/Applications/LazyMac.app/Contents/MacOS/lazymac --schedule daily:04:00`이 같은 일을 해요(`hourly[:MM]`, `every:<N>[:HH:MM]`, `daily:HH:MM`, `weekly:<0-6>:HH:MM`, `show`, `off`).
+
+[`launchd/local.lazymac-daily.plist`](../launchd/local.lazymac-daily.plist)는 앱이 쓰는 내용의 예시예요. `/Users/you`는 내 홈 폴더, `/Users/you/lazymac`은 내 목록 저장소 자리예요.
+
+| 키 | 앱이 넣는 값 |
+|---|---|
+| `ProgramArguments` | 목록 저장소와 bun이 있으면 `bun exec "/bin/zsh '<저장소>/bin/daily.sh' --if-due"`. launchd가 띄운 `/bin/zsh`는 `~/Documents`를 못 읽지만 bun은 읽을 수 있고, bun이 띄운 zsh가 그 권한을 물려받아요. 저장소나 bun이 없으면 앱 자신의 실행 파일에 `--run-backup --if-due`(LazyMac에 '파일 및 폴더 전체 접근' 권한 필요) |
+| `WorkingDirectory` | 목록 저장소, 없으면 홈 폴더 |
+| `EnvironmentVariables` | `HOME`, Homebrew·`~/.bun/bin`·`~/.local/bin`이 들어간 `PATH`, 그리고 앱을 그 값으로 띄웠다면 `LAZYMAC_DATA` / `LAZYMAC_STORAGE_CONF` |
+| `StartCalendarInterval` | 고른 일정 |
+| `RunAtLoad`, `StartInterval`(1800) | 놓친 백업 따라잡기: 로그인할 때와 30분마다도 깨어나고, `--if-due`가 붙어 있어서 실제로 밀린 백업이 있을 때만 백업해요 |
+| `StandardOutPath`, `StandardErrorPath` | `~/Library/Logs/lazymac-daily/launchd.log` |
+
+`LAZYMAC_LAUNCHAGENTS_DIR`로 다른 폴더에 쓸 수 있어요(테스트에서 `LAZYMAC_LAUNCHCTL`의 가짜 `launchctl`과 함께 써요).
+
 ## 훅과 환경 변수
 
 ### 훅 (`LAZYMAC_HOOKS`)

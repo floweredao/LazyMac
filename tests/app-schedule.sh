@@ -49,7 +49,7 @@ touch $TMP/running
 set +e; $BIN --schedule daily:05:00 >/dev/null 2>&1; c=$?; set -e
 check "a running backup is not interrupted (exit 1, schedule unchanged)" "[[ $c == 1 && \$(cal) == '{\"Minute\":45}' ]]"
 rm $TMP/running
-cp $REPO/launchd/local.lazymac-daily.plist $P
+cp $REPO/tests/fixtures/older-daily.plist $P
 : > $TMP/calls
 $BIN --schedule upgrade >/dev/null
 check "a job from an older LazyMac gets the catch-up keys and is reloaded" \

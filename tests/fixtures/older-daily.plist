@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>local.lazymac-daily</string>
+<!-- A daily job as LazyMac before 1.5 wrote it: no --if-due, RunAtLoad, StartInterval or AssociatedBundleIdentifiers. tests/app-schedule.sh upgrades it. -->
+<key>ProgramArguments</key><array><string>/Users/you/.bun/bin/bun</string><string>exec</string><string>/bin/zsh /Users/you/lazymac/bin/daily.sh</string></array>
+<key>WorkingDirectory</key><string>/Users/you/lazymac</string>
+<key>EnvironmentVariables</key><dict>
+  <key>HOME</key><string>/Users/you</string>
+  <key>PATH</key><string>/opt/homebrew/bin:/opt/homebrew/sbin:/Users/you/.bun/bin:/Users/you/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+</dict>
+<key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+<key>ProcessType</key><string>Background</string>
+<key>LowPriorityIO</key><true/>
+<key>StandardOutPath</key><string>/Users/you/Library/Logs/lazymac-daily/launchd.log</string>
+<key>StandardErrorPath</key><string>/Users/you/Library/Logs/lazymac-daily/launchd.log</string>
+</dict></plist>
