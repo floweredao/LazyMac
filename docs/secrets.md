@@ -21,16 +21,32 @@ When cataloging credentials and state files on your Mac, group them into three k
 | Google Cloud CLI | `~/.config/gcloud/` (excluding `logs/`, `cache/`, `virtenv/`) | `gcloud auth login` and `gcloud auth application-default login` | Reissue |
 | rclone config (for example `gdrive`) | `~/.config/rclone/rclone.conf` | Connect in LazyMac (*Back Up > Folders*) or run `rclone config create gdrive drive scope=drive.file` | Reissue |
 | Docker registry logins | `~/.docker/config.json` | `docker login` | Reissue |
-| Coding agent sign-in | the agent's auth file, for example `~/.codex/auth.json` | Sign in again with the CLI | Reissue |
+| Coding agent auth | `~/.omo/agent/auth.json`, `~/.codex/auth.json` | Sign in again with the CLI | Reissue |
 
 ## Example Keychain items (generic passwords)
 
 | What | Keychain service | How to get it again | Kind |
 |---|---|---|---|
 | Cloudflare Pages deploy token | `lazymac-cloudflare` (or `$LAZYMAC_CF_KEYCHAIN`, accounts `api-token` and `account-id`) | Cloudflare dashboard > My Profile > API Tokens, then store with `security add-generic-password` | Reissue |
-| An API key you saved yourself | for example `example-api` | The provider's console | Reissue |
+| Anthropic Console API keys for omo | `omo-anthropic-api` (one item per account: `main`, `work`, ...) | Anthropic Console > API Keys, then `pbpaste \| bun bin/omo-anthropic.ts add <name>` | Reissue |
+| Gemini API key | `gemini-api` | Google AI Studio > API keys | Reissue |
 | GitHub CLI token | `gh:github.com` | `gh auth login` | Reissue |
 | App Safe Storage keys | `Code Safe Storage`, `Slack Safe Storage`, `Notion Safe Storage`, etc. | Created automatically by each app; sign in to the app again | Auto |
+
+## Optional integration: Anthropic API keys for omo
+
+Only for people who use the [omo](https://github.com/code-yeongyu/oh-my-openagent) coding agent. LazyMac works the same without it, and nothing below runs on a Mac with no `omo-anthropic-api` Keychain items.
+
+`bin/omo-anthropic.ts` turns every `omo-anthropic-api` Keychain item into one omo provider, `anthropic-api`, with one account per key (`main` first and pinned). omo always uses the pinned key first and moves to the next only when it fails (auth error, rate limit, or credit exhaustion). After restoring the bundle, `bin/setup.sh secrets` runs `sync` only when such items exist; a failed sync is a warning, not a failed step. To run a step of your own after the restore, use the `after-secrets` hook ([advanced settings](advanced.md#hooks-lazymac_hooks)).
+
+```sh
+pbpaste | bun bin/omo-anthropic.ts add main   # store a new key (read from stdin), then sync
+bun bin/omo-anthropic.ts list                 # print account names only (never values)
+bun bin/omo-anthropic.ts sync                 # rewrite the provider in ~/.omo/agent/models.json and auth.json
+bun bin/omo-anthropic.ts check                # verify each key with GET /v1/models (costs nothing)
+```
+
+Restart omo after a change. Test: `tests/omo-anthropic.sh` (uses a temporary Keychain and folder with fake keys).
 
 ## Accounts to sign in again (no local file to move)
 
@@ -52,7 +68,8 @@ exclude:.config/gcloud/virtenv
 
 # Keychain generic-password service names (glob patterns allowed)
 keychain:lazymac-cloudflare
-keychain:example-api
+keychain:omo-anthropic-api
+keychain:gemini-api
 keychain:gh:github.com
 
 # Private LaunchAgent plists and helper scripts not tracked in a public repo

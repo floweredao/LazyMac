@@ -205,10 +205,14 @@ step_dotfiles() {
   return $bad
 }
 
-# An executable hooks/after-secrets runs once the bundle is back, for steps of your own (for example a tool that
-# reads the restored Keychain items into its own config).
+# Once the bundle is back: the omo provider sync, but only on a Mac that keeps those Keychain keys (and it never
+# fails this step), then an executable hooks/after-secrets for steps of your own.
 step_secrets() {
   "$REPO/bin/secrets-restore.sh" || return 1
+  local bun=$HOME/.bun/bin/bun provider=$REPO/bin/omo-anthropic.ts
+  if [[ -x $bun && -f $provider ]] && [[ -n $("$bun" "$provider" list 2>/dev/null) ]]; then
+    "$bun" "$provider" sync || say "warn    the omo provider sync failed; nothing else was changed"
+  fi
   [[ -x $HOOKS/after-secrets ]] || return 0
   say "run     ${HOOKS/#$HOME/~}/after-secrets"
   "$HOOKS/after-secrets" || { say "failed  after-secrets hook failed"; return 1; }
