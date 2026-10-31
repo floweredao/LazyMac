@@ -89,7 +89,7 @@ Blind spot: this evidence only sees this Mac. An app whose account syncs across 
 | `+ <section>/<id>` / `- <section>/<id>` | One row, by `section` and the `id` column as written |
 | `skip <step>...` | Setup steps the profile leaves out (for example `skip dotfiles secrets`) |
 
-Names use `a-z`, `0-9`, and `-`. A wrong group, row, step, or a loop stops with exit 2. `machines.tsv` gives each Mac a role and its profiles (`pro,dev`: the Mac profile first, then add-ons); the app picks those when it opens and can save the current choice as a new Mac profile (committed and pushed). `tests/profiles.sh` checks the rules; `tests/app-setup-files.sh` checks that the app writes the same lists as `catalog.ts profile`.
+Names use `a-z`, `0-9`, and `-`. A wrong group, row, step, or a loop stops with exit 2. `machines.tsv` gives each Mac a role and its profiles (`pro,dev`: the Mac profile first, then add-ons); the app picks those when it opens and can save the current choice as a new Mac profile (written to `profiles/<name>.txt` and copied to the backup place). `tests/profiles.sh` checks the rules; `tests/app-setup-files.sh` checks that the app writes the same lists as `catalog.ts profile`.
 
 ## Every day at 04:00 (main Mac)
 
